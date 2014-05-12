@@ -27,6 +27,7 @@ namespace Konafets\DoctrineDbal\Persistence\Doctrine;
  *
  *  This copyright notice MUST APPEAR in all copies of the script!
  ***************************************************************/
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Class DatabaseConnection
@@ -35,6 +36,85 @@ namespace Konafets\DoctrineDbal\Persistence\Doctrine;
  * @author  Stefano Kowalke <blueduck@gmx.net>
  */
 class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\DatabaseConnection {
+	/**
+	 * Returns the database username
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function getDatabaseUsername() {
+		return $this->databaseUsername;
+	}
+
+	/**
+	 * Returns database password
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function getDatabasePassword() {
+		return $this->databaseUserPassword;
+	}
+
+	/**
+	 * Returns the name of the database
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function getDatabaseName() {
+		return $this->databaseName;
+	}
+
+	/**
+	 * Returns the host of the database
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function getDatabaseHost() {
+		return $this->databaseHost;
+	}
+
+	/**
+	 * Returns the database socket
+	 *
+	 * @return NULL|string
+	 * @api
+	 */
+	public function getDatabaseSocket() {
+		return $this->databaseSocket;
+	}
+
+	/**
+	 * Returns the database port
+	 *
+	 * @return int
+	 * @api
+	 */
+	public function getDatabasePort() {
+		return (int) $this->databasePort;
+	}
+
+	/**
+	 * Returns the connection charset
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function getConnectionCharset() {
+		return $this->connectionCharset;
+	}
+
+	/**
+	 * Returns if the connection is set to compressed
+	 *
+	 * @return bool
+	 */
+	public function isConnectionCompressed() {
+		return $this->connectionCompression;
+	}
+
 	/**
 	 * Select a SQL database
 	 *
@@ -54,7 +134,27 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function connectDatabase() {
-		parent::connectDB();
+		// Early return if connected already
+		if ($this->isConnected) {
+			return;
+		}
+
+		$this->checkDatabasePreconditions();
+
+		try {
+			$this->link = $this->getConnection();
+		} catch (\Exception $e) {
+			echo $e->getMessage();
+		}
+
+		$this->isConnected = $this->checkConnectivity();
+
+		if ($this->isConnected) {
+			$this->initCommandsAfterConnect();
+			$this->selectDatabase();
+		}
+
+		$this->prepareHooks();
 	}
 
 	/**
@@ -64,7 +164,161 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @throws \RuntimeException
 	 */
 	public function getConnection() {
-		return parent::sql_pconnect();
+		if ($this->isConnected) {
+			return $this->link;
+		}
+
+		if (!extension_loaded('mysqli')) {
+			throw new \RuntimeException(
+				'Database Error: PHP mysqli extension not loaded. This is a must have for TYPO3 CMS!',
+				1271492607
+			);
+		}
+
+		$host = $this->persistentDatabaseConnection
+			? 'p:' . $this->getDatabaseHost()
+			: $this->getDatabaseHost();
+
+		$this->link = mysqli_init();
+		$connected = $this->link->real_connect(
+			$host,
+			$this->getDatabaseUsername(),
+			$this->getDatabasePassword(),
+			NULL,
+			$this->getDatabasePort(),
+			$this->getDatabaseSocket(),
+			$this->isConnectionCompressed() ? MYSQLI_CLIENT_COMPRESS : 0
+		);
+
+		if ($connected) {
+			$this->isConnected = TRUE;
+
+			if ($this->link->set_charset($this->connectionCharset) === FALSE) {
+				GeneralUtility::sysLog(
+					'Error setting connection charset to "' . $this->getConnectionCharset() . '"',
+					'Core',
+					GeneralUtility::SYSLOG_SEVERITY_ERROR
+				);
+			}
+
+			foreach ($this->initializeCommandsAfterConnect as $command) {
+				if ($this->query($command) === FALSE) {
+					GeneralUtility::sysLog(
+						'Could not initialize DB connection with query "' . $command . '": ' . $this->getErrorMessage(),
+						'Core',
+						GeneralUtility::SYSLOG_SEVERITY_ERROR
+					);
+				}
+			}
+			$this->setSqlMode();
+			$this->checkConnectionCharset();
+		} else {
+			// @TODO: This should raise an exception. Would be useful especially to work during installation.
+			$errorMsg = $this->link->connect_error;
+			$this->link = NULL;
+			GeneralUtility::sysLog(
+				'Could not connect to MySQL server ' . $host . ' with user ' . $this->getDatabaseUsername() . ': ' . $errorMsg,
+				'Core',
+				GeneralUtility::SYSLOG_SEVERITY_FATAL
+			);
+		}
+
+		return $this->link;
+	}
+
+	/**
+	 * @throws \RuntimeException
+	 * @return void
+	 */
+	private function checkDatabasePreConditions() {
+		if (!$this->getDatabaseName()) {
+			throw new \RuntimeException(
+				'TYPO3 Fatal Error: No database specified!',
+				1270853882
+			);
+		}
+	}
+
+	/**
+	 * @throws \RuntimeException
+	 * @return bool
+	 */
+	private function checkConnectivity() {
+		$connected = FALSE;
+		if ($this->isConnected()) {
+			$connected = TRUE;
+		} else {
+			GeneralUtility::sysLog(
+				'Could not connect to MySQL server ' . $this->getDatabaseHost() . ' with user ' . $this->getDatabaseUsername() . ': ' . $this->sqlErrorMessage(),
+				'Core',
+				GeneralUtility::SYSLOG_SEVERITY_FATAL
+			);
+
+			$this->close();
+
+			throw new \RuntimeException(
+				'TYPO3 Fatal Error: The current username, password or host was not accepted when the connection to the database was attempted to be established!',
+				1270853884
+			);
+		}
+
+		return $connected;
+	}
+
+	/**
+	 * Prepare user defined objects (if any) for hooks which extend query methods
+	 *
+	 * @throws \UnexpectedValueException
+	 * @return void
+	 */
+	private function prepareHooks() {
+		$this->preProcessHookObjects = array();
+		$this->postProcessHookObjects = array();
+		if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_db.php']['queryProcessors'])) {
+			foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_db.php']['queryProcessors'] as $classRef) {
+				$hookObject = GeneralUtility::getUserObj($classRef);
+				if (!(
+					$hookObject instanceof \TYPO3\CMS\Core\Database\PreProcessQueryHookInterface
+					|| $hookObject instanceof \TYPO3\CMS\Core\Database\PostProcessQueryHookInterface
+				)) {
+					throw new \UnexpectedValueException(
+						'$hookObject must either implement interface TYPO3\\CMS\\Core\\Database\\PreProcessQueryHookInterface or interface TYPO3\\CMS\\Core\\Database\\PostProcessQueryHookInterface',
+						1299158548
+					);
+				}
+				if ($hookObject instanceof \TYPO3\CMS\Core\Database\PreProcessQueryHookInterface) {
+					$this->preProcessHookObjects[] = $hookObject;
+				}
+				if ($hookObject instanceof \TYPO3\CMS\Core\Database\PostProcessQueryHookInterface) {
+					$this->postProcessHookObjects[] = $hookObject;
+				}
+			}
+		}
+	}
+
+	public function close() {
+		$this->link->close();
+		$this->isConnected = FALSE;
+
+	}
+
+	/**
+	 * Send initializing query to the database to prepare the database for TYPO3
+	 *
+	 * @return void
+	 */
+	private function initCommandsAfterConnect() {
+		foreach ($this->initializeCommandsAfterConnect as $command) {
+			if ($this->query($command) === FALSE) {
+				GeneralUtility::sysLog(
+					'Could not initialize DB connection with query "' . $command . '": ' . $this->getErrorMessage(),
+					'Core',
+					GeneralUtility::SYSLOG_SEVERITY_ERROR
+				);
+			}
+		}
+
+		$this->setSqlMode();
 	}
 
 	/**
@@ -694,4 +948,3 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 		return parent::debug_check_recordset($res);
 	}
 }
-
