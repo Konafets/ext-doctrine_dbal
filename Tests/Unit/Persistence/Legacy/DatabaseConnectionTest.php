@@ -32,7 +32,7 @@ namespace Konafets\DoctrineDbal\Tests\Unit\Persistence\Legacy;
 class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
-	 * @var \TYPO3\CMS\Core\Database\DatabaseConnection
+	 * @var \Konafets\DoctrineDbal\Persistence\Legacy\DatabaseConnection
 	 */
 	protected $subject = NULL;
 
