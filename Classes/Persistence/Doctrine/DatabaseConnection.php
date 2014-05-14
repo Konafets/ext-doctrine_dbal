@@ -27,6 +27,12 @@ namespace Konafets\DoctrineDbal\Persistence\Doctrine;
  *
  *  This copyright notice MUST APPEAR in all copies of the script!
  ***************************************************************/
+use Doctrine\DBAL\DriverManager;
+use Konafets\DoctrineDbal\Exception\ConnectionException;
+use Konafets\DoctrineDbal\Exception\InvalidArgumentException;
+use Konafets\DoctrineDbal\Persistence\Legacy\PreparedStatement;
+use PDO;
+use TYPO3\CMS\Core\Utility\DebugUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -35,7 +41,139 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * @package Konafets\DoctrineDbal\Persistence\Doctrine
  * @author  Stefano Kowalke <blueduck@gmx.net>
  */
-class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\DatabaseConnection {
+class DatabaseConnection {
+
+	/**
+	 * @var int $affectedRows The affected rows from the last UPDATE, INSERT or DELETE query
+	 */
+	protected $affectedRows = -1;
+
+	/**
+	 * @var int $lastInsertId The last id which is inserted
+	 */
+	protected $lastInsertId = -1;
+
+	/**
+	 * Set to last built query (not necessarily executed...)
+	 *
+	 * @param string $debug_lastBuiltQuery
+	 */
+	public $debug_lastBuiltQuery = '';
+
+	/**
+	 * Set "TRUE" if you want the last built query to be stored in $debug_lastBuiltQuery independent of $this->debugOutput
+	 *
+	 * @var bool $store_lastBuiltQuery
+	 */
+	public $store_lastBuiltQuery = FALSE;
+
+	/**
+	 * Set "TRUE" or "1" if you want database errors outputted. Set to "2" if you also want successful database actions outputted.
+	 *
+	 * @param int $debugOutput
+	 */
+	public $debugOutput = FALSE;
+
+	/**
+	 * @var array $connectionParams The connection settings for Doctrine
+	 */
+	protected $connectionParams = array(
+		'dbname'   => '',
+		'user'     => '',
+		'password' => '',
+		'host'     => 'localhost',
+		'driver'   => 'pdo_mysql',
+		'port'     => 3306,
+		'charset'  => 'utf8',
+	);
+
+	/**
+	 * @var \Doctrine\DBAL\Connection $link Database connection object
+	 */
+	protected $link = NULL;
+
+	/**
+	 * @var boolean TRUE if database connection is established
+	 */
+	protected $isConnected = FALSE;
+
+	/**
+	 * The database schema
+	 *
+	 * @var \Doctrine\DBAL\Schema\Schema $schema
+	 */
+	protected $schema = NULL;
+
+	/**
+	 * The database schema
+	 *
+	 * @var \Doctrine\DBAL\Schema\AbstractSchemaManager $schema
+	 */
+	protected $schemaManager = NULL;
+
+	/**
+	 * The current database platform
+	 *
+	 * @var \Doctrine\DBAL\Platforms\AbstractPlatform
+	 */
+	protected $platform = NULL;
+
+	/**
+	 * Set "TRUE" or "1" if you want database errors outputted. Set to "2" if you also want successful database actions outputted.
+	 *
+	 * @var int $isDebugMode
+	 */
+	protected $isDebugMode = FALSE;
+
+	/**
+	 * Set this to 1 to get queries explained (devIPmask must match). Set the value to 2 to the same but disregarding the devIPmask.
+	 * There is an alternative option to enable explain output in the admin panel under "TypoScript", which will produce much nicer output, but only works in FE.
+	 *
+	 * @param int $explainOutput
+	 */
+	public $explainOutput = 0;
+
+	/**
+	 * @var boolean TRUE if database connection should be persistent
+	 * @see http://php.net/manual/de/mysqli.persistconns.php
+	 */
+	protected $persistentDatabaseConnection = FALSE;
+
+	/**
+	 * @var boolean TRUE if connection between client and sql server is compressed
+	 */
+	protected $connectionCompression = FALSE;
+
+	/**
+	 * @var array List of commands executed after connection was established
+	 */
+	protected $initializeCommandsAfterConnect = array();
+
+	/**
+	 * @var array<PostProcessQueryHookInterface> $preProcessHookObjects
+	 */
+	protected $preProcessHookObjects = array();
+
+	/**
+	 * @var array<PreProcessQueryHookInterface> $postProcessHookObjects
+	 */
+	protected $postProcessHookObjects = array();
+
+	/**
+	 * Set database username
+	 *
+	 * @param string $username
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabaseUsername($username) {
+		$this->disconnectIfConnected();
+		$this->connectionParams['user'] = $username;
+
+		return $this;
+	}
+
 	/**
 	 * Returns the database username
 	 *
@@ -43,7 +181,22 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getDatabaseUsername() {
-		return $this->databaseUsername;
+		return $this->connectionParams['user'];
+	}
+
+	/**
+	 * Set database password
+	 *
+	 * @param string $password
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabasePassword($password) {
+		$this->disconnectIfConnected();
+		$this->connectionParams['password'] = $password;
+
+		return $this;
 	}
 
 	/**
@@ -53,7 +206,22 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getDatabasePassword() {
-		return $this->databaseUserPassword;
+		return $this->connectionParams['password'];
+	}
+
+	/**
+	 * Set database name
+	 *
+	 * @param string $name
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabaseName($name) {
+		$this->disconnectIfConnected();
+		$this->connectionParams['dbname'] = $name;
+
+		return $this;
 	}
 
 	/**
@@ -63,7 +231,46 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getDatabaseName() {
-		return $this->databaseName;
+		return $this->connectionParams['dbname'];
+	}
+
+	/**
+	 * Set the database driver for Doctrine
+	 *
+	 * @param string $driver
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabaseDriver($driver = 'pdo_mysql') {
+		$this->connectionParams['driver'] = $driver;
+
+		return $this;
+	}
+
+	/**
+	 * Returns the database driver
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function getDatabaseDriver() {
+		return $this->connectionParams['driver'];
+	}
+
+	/**
+	 * Set database host
+	 *
+	 * @param string $host
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabaseHost($host = 'localhost') {
+		$this->disconnectIfConnected();
+		$this->connectionParams['host'] = $host;
+
+		return $this;
 	}
 
 	/**
@@ -73,7 +280,22 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getDatabaseHost() {
-		return $this->databaseHost;
+		return $this->connectionParams['host'];
+	}
+
+	/**
+	 * Set database socket
+	 *
+	 * @param string|NULL $socket
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabaseSocket($socket = NULL) {
+		$this->disconnectIfConnected();
+		$this->connectionParams['unix_socket'] = $socket;
+
+		return $this;
 	}
 
 	/**
@@ -83,7 +305,26 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getDatabaseSocket() {
-		return $this->databaseSocket;
+		return $this->connectionParams['unix_socket'];
+	}
+
+	/**
+	 * Set database port
+	 *
+	 * @param integer $port
+	 *
+	 * @throws \Konafets\DoctrineDbal\Exception\InvalidArgumentException
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabasePort($port = 3306) {
+		if (!is_numeric($port)) {
+			throw new InvalidArgumentException('The argument for port must be an integer.');
+		}
+		$this->disconnectIfConnected();
+		$this->connectionParams['port'] = (int) $port;
+
+		return $this;
 	}
 
 	/**
@@ -93,17 +334,46 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getDatabasePort() {
-		return (int) $this->databasePort;
+		return (int)$this->connectionParams['port'];
 	}
 
 	/**
-	 * Returns the connection charset
+	 * @var \Doctrine\DBAL\Configuration $databaseConfiguration
+	 */
+	protected $databaseConfiguration;
+
+	/**
+	 * Set the charset that should be used for the MySQL connection.
+	 *
+	 * @param string $charset The connection charset that will be passed on to mysqli_set_charset() when connecting the database. Default is utf8.
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setDatabaseCharset($charset = 'utf8') {
+		$this->disconnectIfConnected();
+		$this->connectionParams['charset'] = $charset;
+
+		return $this;
+	}
+
+	/**
+	 * Returns default charset
 	 *
 	 * @return string
 	 * @api
 	 */
-	public function getConnectionCharset() {
-		return $this->connectionCharset;
+	public function getDatabaseCharset() {
+		return $this->connectionParams['charset'];
+	}
+
+	/**
+	 * Set the connection parameter array
+	 *
+	 * @param array $connectionParams
+	 */
+	public function setConnectionParams(array $connectionParams) {
+		$this->connectionParams = $connectionParams;
 	}
 
 	/**
@@ -116,45 +386,207 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	}
 
 	/**
+	 * Enables/Disables the storage of the last statement
+	 *
+	 * @param $value
+	 *
+	 * @return $this
+	 * @api
+	 */
+	public function setStoreLastBuildQuery($value) {
+		$this->store_lastBuiltQuery = (bool)$value;
+	}
+
+	/**
+	 * Returns the settings if the last build query should be stored
+	 *
+	 * @return bool
+	 * @api
+	 */
+	public function getStoreLastBuildQuery() {
+		return $this->store_lastBuiltQuery;
+	}
+
+	/**
+	 * Set the debug mode.
+	 *
+	 * Possible values are:
+	 *
+	 * - 0|FALSE: deactivate debug mode
+	 * - 1|TRUE:  activate debug mode
+	 * - 2     :  output also successful database actions
+	 *
+	 * @param int $mode
+	 *
+	 * @return $this
+	 */
+	public function setDebugMode($mode){
+		$this->debugOutput = $mode;
+
+		return $this;
+	}
+
+	/**
+	 * Return the debug mode setting
+	 *
+	 * @return int
+	 */
+	public function getDebugMode(){
+		return (int)$this->debugOutput;
+	}
+
+	/**
+	 * Set current database handle
+	 *
+	 * @param \Doctrine\DBAL\Connection $handle
+	 *
+	 * @throws \Konafets\DoctrineDbal\Exception\InvalidArgumentException
+	 * @return void
+	 * @api
+	 */
+	public function setDatabaseHandle($handle) {
+		if ($handle instanceof \Doctrine\DBAL\Connection || $handle === NULL) {
+			$this->link = $handle;
+		} else {
+			throw new InvalidArgumentException('Wrong type of argument given to setDatabaseHandle. Need to be of type \Doctrine\DBAL\Connection.');
+		}
+
+	}
+
+	/**
+	 * Returns current database handle
+	 *
+	 * @return \Doctrine\DBAL\Connection|NULL
+	 * @api
+	 */
+	public function getDatabaseHandle() {
+		return $this->link;
+	}
+
+	/**
+	 * Initialize the database connection
+	 *
+	 * @return void
+	 */
+	public function initialize() {
+		// Intentionally blank as this will be overloaded by DBAL
+	}
+
+	/**
+	 * Returns the name of the database system
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function getName() {
+		return $this->link->getDatabasePlatform()->getName();
+	}
+
+	/**
+	 * Returns the schema object
+	 *
+	 * @return \Doctrine\DBAL\Schema\Schema
+	 */
+	public function getSchema() {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		return $this->schema;
+	}
+
+	/**
+	 * Returns the schema manager
+	 *
+	 * @return \Doctrine\DBAL\Schema\AbstractSchemaManager
+	 */
+	public function getSchemaManager() {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		return $this->schemaManager;
+	}
+
+	/**
 	 * Select a SQL database
 	 *
+	 * @throws \Konafets\DoctrineDbal\Exception\ConnectionException
 	 * @return boolean Returns TRUE on success or FALSE on failure.
 	 */
 	public function selectDatabase() {
-		return parent::sql_select_db();
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$isConnected = $this->isConnected();
+
+		if (!$isConnected) {
+			GeneralUtility::sysLog(
+				'Could not select ' . $this->getName() . ' database ' . $this->getDatabaseName() . ': ' . $this->sqlErrorMessage(),
+				'Core',
+				GeneralUtility::SYSLOG_SEVERITY_FATAL
+			);
+
+			throw new ConnectionException(
+				'TYPO3 Fatal Error: Cannot connect to the current database, "' . $this->getDatabaseName() . '"!',
+				1270853883
+			);
+		}
+
+		return $isConnected;
+	}
+
+	public function connectDB($isInitialInstallationInProgress = FALSE) {
+		$this->connectDatabase($isInitialInstallationInProgress);
 	}
 
 	/**
 	 * Connects to database for TYPO3 sites:
 	 *
-	 * @throws \RuntimeException
-	 * @throws \UnexpectedValueException
+	 * @param boolean $isInitialInstallationInProgress
 	 *
+	 * @throws \Konafets\DoctrineDbal\Exception\ConnectionException
 	 * @return void
 	 * @api
 	 */
-	public function connectDatabase() {
+	public function connectDatabase($isInitialInstallationInProgress = FALSE) {
 		// Early return if connected already
 		if ($this->isConnected) {
 			return;
 		}
 
-		$this->checkDatabasePreconditions();
+		if (!$isInitialInstallationInProgress) {
+			$this->checkDatabasePreconditions();
+		}
 
 		try {
 			$this->link = $this->getConnection();
 		} catch (\Exception $e) {
-			echo $e->getMessage();
+			throw new ConnectionException($e->getMessage());
 		}
 
 		$this->isConnected = $this->checkConnectivity();
 
-		if ($this->isConnected) {
-			$this->initCommandsAfterConnect();
-			$this->selectDatabase();
-		}
+		if (!$isInitialInstallationInProgress) {
+			if ($this->isConnected) {
+				$this->initCommandsAfterConnect();
+				$this->selectDatabase();
+			}
 
-		$this->prepareHooks();
+			$this->prepareHooks();
+		}
+	}
+
+	/**
+	 * Initialize Doctrine
+	 *
+	 * @return void
+	 */
+	private function initDoctrine() {
+		$this->databaseConfiguration = GeneralUtility::makeInstance('\\Doctrine\\DBAL\\Configuration');
+//		$this->databaseConfiguration->setSQLLogger(new DebugStack());
+		$this->schema = GeneralUtility::makeInstance('\\Doctrine\\DBAL\\Schema\\Schema');
 	}
 
 	/**
@@ -168,62 +600,47 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 			return $this->link;
 		}
 
-		if (!extension_loaded('mysqli')) {
+		$this->checkForDatabaseExtensionLoaded();
+
+		$this->initDoctrine();
+
+		// If the user want a persistent connection we have to create the PDO instance by ourself and pass it to Doctrine.
+		// See http://stackoverflow.com/questions/16217426/is-it-possible-to-use-doctrine-with-persistent-pdo-connections
+		// http://www.mysqlperformanceblog.com/2006/11/12/are-php-persistent-connections-evil/
+		if ($this->persistentDatabaseConnection) {
+			// pattern: mysql:host=localhost;dbname=databaseName
+			$cdn = substr($this->getDatabaseDriver(), 3) . ':host=' . $this->getDatabaseHost() . ';dbname=' . $this->getDatabaseName();
+			$pdoHandle = new \PDO($cdn, $this->getDatabaseUsername(), $this->getDatabasePassword(), array(\PDO::ATTR_PERSISTENT => true));
+			$this->connectionParams['pdo'] = $pdoHandle;
+		}
+
+		$connection = DriverManager::getConnection($this->connectionParams, $this->databaseConfiguration);
+		$this->platform = $connection->getDatabasePlatform();
+
+		$connection->connect();
+
+		// We need to map the enum type to string because Doctrine don't support it native
+		// This is necessary when the installer loops through all tables of all databases it found using this connection
+		// See https://github.com/barryvdh/laravel-ide-helper/issues/19
+		$this->platform->registerDoctrineTypeMapping('enum', 'string');
+		$this->schemaManager = $connection->getSchemaManager();
+
+		return $connection;
+	}
+
+	/**
+	 * Checks if the PDO database extension is loaded
+	 *
+	 * @throws \RuntimeException
+	 */
+	private function checkForDatabaseExtensionLoaded(){
+		if (!extension_loaded('pdo')) {
 			throw new \RuntimeException(
-				'Database Error: PHP mysqli extension not loaded. This is a must have for TYPO3 CMS!',
-				1271492607
+				'Database Error: PHP PDO extension not loaded. This is a must to use this extension (ext:doctrine_dbal)!',
+				// TODO: Replace with current date for Thesis
+				1388496499
 			);
 		}
-
-		$host = $this->persistentDatabaseConnection
-			? 'p:' . $this->getDatabaseHost()
-			: $this->getDatabaseHost();
-
-		$this->link = mysqli_init();
-		$connected = $this->link->real_connect(
-			$host,
-			$this->getDatabaseUsername(),
-			$this->getDatabasePassword(),
-			NULL,
-			$this->getDatabasePort(),
-			$this->getDatabaseSocket(),
-			$this->isConnectionCompressed() ? MYSQLI_CLIENT_COMPRESS : 0
-		);
-
-		if ($connected) {
-			$this->isConnected = TRUE;
-
-			if ($this->link->set_charset($this->connectionCharset) === FALSE) {
-				GeneralUtility::sysLog(
-					'Error setting connection charset to "' . $this->getConnectionCharset() . '"',
-					'Core',
-					GeneralUtility::SYSLOG_SEVERITY_ERROR
-				);
-			}
-
-			foreach ($this->initializeCommandsAfterConnect as $command) {
-				if ($this->query($command) === FALSE) {
-					GeneralUtility::sysLog(
-						'Could not initialize DB connection with query "' . $command . '": ' . $this->getErrorMessage(),
-						'Core',
-						GeneralUtility::SYSLOG_SEVERITY_ERROR
-					);
-				}
-			}
-			$this->setSqlMode();
-			$this->checkConnectionCharset();
-		} else {
-			// @TODO: This should raise an exception. Would be useful especially to work during installation.
-			$errorMsg = $this->link->connect_error;
-			$this->link = NULL;
-			GeneralUtility::sysLog(
-				'Could not connect to MySQL server ' . $host . ' with user ' . $this->getDatabaseUsername() . ': ' . $errorMsg,
-				'Core',
-				GeneralUtility::SYSLOG_SEVERITY_FATAL
-			);
-		}
-
-		return $this->link;
 	}
 
 	/**
@@ -249,7 +666,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 			$connected = TRUE;
 		} else {
 			GeneralUtility::sysLog(
-				'Could not connect to MySQL server ' . $this->getDatabaseHost() . ' with user ' . $this->getDatabaseUsername() . ': ' . $this->sqlErrorMessage(),
+				'Could not connect to ' . $this->getName() . ' server ' . $this->getDatabaseHost() . ' with user ' . $this->getDatabaseUsername() . ': ' . $this->getErrorMessage(),
 				'Core',
 				GeneralUtility::SYSLOG_SEVERITY_FATAL
 			);
@@ -296,6 +713,32 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 		}
 	}
 
+	/**
+	 * Checks if database is connected
+	 *
+	 * @return boolean
+	 * @api
+	 */
+	public function isConnected() {
+		if (is_object($this->link)) {
+			return $this->link->isConnected();
+		} else {
+			return FALSE;
+		}
+	}
+
+	/**
+	 * Disconnect from database if connected
+	 *
+	 * @return void
+	 * @api
+	 */
+	public function disconnectIfConnected() {
+		if ($this->isConnected) {
+			$this->close();
+		}
+	}
+
 	public function close() {
 		$this->link->close();
 		$this->isConnected = FALSE;
@@ -319,18 +762,72 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 		}
 
 		$this->setSqlMode();
+		$this->checkConnectionCharset();
 	}
 
 	/**
-	 * mysqli() wrapper function, used by the Install Tool and EM for all queries regarding management of the database!
+	 * Fixes the SQL mode by unsetting NO_BACKSLASH_ESCAPES if found.
+	 *
+	 * @return void
+	 * @todo: Test the server with different modes
+	 *        see http://dev.mysql.com/doc/refman/5.1/de/server-sql-mode.html
+	 */
+	protected function setSqlMode() {
+		$resource = $this->adminQuery('SELECT @@SESSION.sql_mode;');
+		if ($resource) {
+			$result = $resource->fetchAll();
+			if (isset($result[0]) && $result[0] && strpos($result[0]['@@SESSION.sql_mode'], 'NO_BACKSLASH_ESCAPES') !== FALSE) {
+				$modes = array_diff(GeneralUtility::trimExplode(',', $result[0]['@@SESSION.sql_mode']), array('NO_BACKSLASH_ESCAPES'));
+				$stmt = $this->link->prepare('SET sql_mode = :modes');
+				$stmt->bindValue('modes', implode(',', $modes));
+				$stmt->execute();
+				GeneralUtility::sysLog(
+					'NO_BACKSLASH_ESCAPES could not be removed from SQL mode: ' . $this->getErrorMessage(),
+					'Core',
+					GeneralUtility::SYSLOG_SEVERITY_ERROR
+				);
+			}
+		}
+	}
+
+	/**
+	 * Executes a query against the DBMS
+	 *
+	 * @param string $query
+	 *
+	 * @return \Doctrine\DBAL\Statement
+	 */
+	protected function query($query) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$stmt = $this->link->query($query);
+
+		$this->affectedRows = $this->getResultRowCount($stmt);
+
+		return $stmt;
+	}
+
+	/**
+	 * Doctrine query wrapper function, used by the Install Tool and EM for all queries regarding management of the database!
 	 *
 	 * @param string $query Query to execute
 	 *
-	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
-	 * @api
+	 * @return boolean|\Doctrine\DBAL\Driver\Statement A PDOStatement object
 	 */
 	public function adminQuery($query) {
-		return parent::admin_query($query);
+		if (!$this->isConnected) {
+				$this->connectDatabase();
+			}
+
+			$stmt = $this->link->query($query);
+
+			if ($this->isDebugMode) {
+				$this->debug('adminQuery', $query);
+			}
+
+			return $stmt;
 	}
 
 	/**
@@ -347,7 +844,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeInsertQuery($table, array $data, $noQuoteFields = FALSE) {
-		return parent::exec_INSERTquery($table, $data, $noQuoteFields);
 	}
 
 	/**
@@ -362,7 +858,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeInsertMultipleRows($table, array $data, array $rows, $noQuoteFields = FALSE) {
-		return parent::exec_INSERTmultipleRows($table, $data, $rows, $noQuoteFields);
 	}
 
 	/**
@@ -382,7 +877,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeUpdateQuery($table, $where, array $data, $noQuoteFields = FALSE) {
-		return parent::exec_UPDATEquery($table, $where, $data, $noQuoteFields);
 	}
 
 	/**
@@ -396,7 +890,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeDeleteQuery($table, $where) {
-		return parent::exec_DELETEquery($table, $where);
 	}
 
 	/**
@@ -416,7 +909,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeSelectQuery($selectFields, $fromTable, $whereClause, $groupBy = '', $orderBy = '', $limit = '') {
-		return parent::exec_SELECTquery($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $limit);
 	}
 
 	/**
@@ -444,7 +936,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeSelectMmQuery($select, $localTable, $mmTable, $foreignTable, $whereClause = '', $groupBy = '', $orderBy = '', $limit = '') {
-		return parent::exec_SELECT_mm_query($select, $localTable, $mmTable, $foreignTable, $whereClause, $groupBy, $orderBy, $limit);
 	}
 
 	/**
@@ -457,7 +948,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeSelectQueryArray(array $queryParts) {
-		return parent::exec_SELECT_queryArray($queryParts);
 	}
 
 	/**
@@ -476,7 +966,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeSelectGetRows($selectFields, $fromTable, $whereClause, $groupBy = '', $orderBy = '', $limit = '', $uidIndexField = '') {
-		return parent::exec_SELECTgetRows($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $limit, $uidIndexField);
 	}
 
 	/**
@@ -495,7 +984,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeSelectGetSingleRow($selectFields, $fromTable, $whereClause, $groupBy = '', $orderBy = '', $numIndex = FALSE) {
-		return parent::exec_SELECTgetSingleRow($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $numIndex);
 	}
 
 	/**
@@ -509,7 +997,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeSelectCountRows($field, $table, $where = '') {
-		return parent::exec_SELECTcountRows($field, $table, $where);
 	}
 
 	/**
@@ -521,7 +1008,6 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function executeTruncateQuery($table) {
-		return parent::exec_TRUNCATEquery($table);
 	}
 
 	/**
@@ -535,7 +1021,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function createInsertQuery($table, array $data, $noQuoteFields = FALSE) {
-		return parent::INSERTquery($table, $data, $noQuoteFields);
+
 	}
 
 	/**
@@ -550,7 +1036,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function createInsertMultipleRowsQuery($table, array $fields, array $rows, $noQuoteFields = FALSE) {
-		return parent::INSERTmultipleRows($table, $fields, $rows, $noQuoteFields);
+
 	}
 
 	/**
@@ -567,7 +1053,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function createUpdateQuery($table, $where, array $data, $noQuoteFields = FALSE) {
-		return parent::UPDATEquery($table, $where, $data, $noQuoteFields);
+
 	}
 
 	/**
@@ -581,7 +1067,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function createDeleteQuery($table, $where) {
-		return parent::DELETEquery($table, $where);
+
 	}
 
 	/**
@@ -598,7 +1084,24 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function createSelectQuery($selectFields, $fromTable, $whereClause, $groupBy = '', $orderBy = '', $limit = '') {
-		return parent::SELECTquery($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $limit);
+		foreach ($this->preProcessHookObjects as $hookObject) {
+			/** @var $hookObject PreProcessQueryHookInterface */
+			$hookObject->SELECTquery_preProcessAction($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $limit, $this);
+		}
+		// Table and fieldnames should be "SQL-injection-safe" when supplied to this function
+		// Build basic query
+		$query = 'SELECT ' . $selectFields . ' FROM ' . $fromTable . ((string)$whereClause !== '' ? ' WHERE ' . $whereClause : '');
+		// Group by
+		$query .= (string)$groupBy !== '' ? ' GROUP BY ' . $groupBy : '';
+		// Order by
+		$query .= (string)$orderBy !== '' ? ' ORDER BY ' . $orderBy : '';
+		// Group by
+		$query .= (string)$limit !== '' ? ' LIMIT ' . $limit : '';
+		// Return query
+		if ($this->debugOutput || $this->store_lastBuiltQuery) {
+			$this->debug_lastBuiltQuery = $query;
+		}
+		return $query;
 	}
 
 	/**
@@ -613,7 +1116,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function createSelectSubQuery($selectFields, $fromTable, $whereClause) {
-		return parent::SELECTsubquery($selectFields, $fromTable, $whereClause);
+
 	}
 
 	/**
@@ -625,7 +1128,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function createTruncateQuery($table) {
-		return parent::TRUNCATEquery($table);
+
 	}
 
 	/**
@@ -637,15 +1140,26 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @param string $groupBy          See executeSelectQuery()
 	 * @param string $orderBy          See executeSelectQuery()
 	 * @param string $limit            See executeSelectQuery()
-	 * @param array  $input_parameters An array of values with as many elements as there are bound parameters in the SQL
+	 * @param array  $inputParameters An array of values with as many elements as there are bound parameters in the SQL
 	 *                                 statement being executed. All values are treated as
 	 *                                 \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_AUTOTYPE.
 	 *
 	 * @return \TYPO3\CMS\Core\Database\PreparedStatement Prepared statement
 	 * @api
 	 */
-	public function prepareSelectQuery($selectFields, $fromTable, $whereClause, $groupBy = '', $orderBy = '', $limit = '', array $input_parameters = array()) {
-		return parent::prepare_SELECTquery($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $limit, $input_parameters);
+	public function prepareSelectQuery($selectFields, $fromTable, $whereClause, $groupBy = '', $orderBy = '', $limit = '', array $inputParameters = array()) {
+		$query = $this->createSelectQuery($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $limit);
+
+		/** @var $preparedStatement \Konafets\DoctrineDbal\Persistence\Doctrine\PreparedStatement */
+		$preparedStatement = GeneralUtility::makeInstance('Konafets\\DoctrineDbal\\Persistence\\Doctrine\\PreparedStatement', $query, $fromTable, $this->link, array());
+
+		// Bind values to parameters
+		foreach ($inputParameters as $key => $value) {
+			$preparedStatement->bindValue($key, $value, PreparedStatement::PARAM_AUTOTYPE);
+		}
+
+		// Return prepared statement
+		return $preparedStatement;
 	}
 
 	/**
@@ -660,7 +1174,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function prepareSelectQueryArray(array $queryParts, array $inputParameters = array()) {
-		return parent::prepare_SELECTqueryArray($queryParts, $inputParameters);
+		return $this->prepare_SELECTquery($queryParts['SELECT'], $queryParts['FROM'], $queryParts['WHERE'], $queryParts['GROUPBY'], $queryParts['ORDERBY'], $queryParts['LIMIT'], $inputParameters);
 	}
 
 	/**
@@ -671,10 +1185,23 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 *
 	 * @internal This method may only be called by \TYPO3\CMS\Core\Database\PreparedStatement
 	 *
-	 * @return \mysqli_stmt|object MySQLi statement / DBAL object
+	 * @return \Doctrine\DBAL\Statement|object MySQLi statement / DBAL object
 	 */
 	public function preparePreparedQuery($query, array $queryComponents) {
-		return parent::prepare_PREPAREDquery($query, $queryComponents);
+		if (!$this->isConnected) {
+			$this->connectDB();
+		}
+
+		$stmt = $this->link->prepare($query);
+		if ($this->debugOutput) {
+			$this->debug('stmt_execute', $query);
+		}
+
+		if ($stmt instanceof \Doctrine\DBAL\Statement) {
+			return $stmt;
+		} else {
+			return NULL;
+		}
 	}
 
 	/**
@@ -690,8 +1217,38 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @see quoteString()
 	 */
 	public function fullQuoteString($string, $table, $allowNull = FALSE) {
-		return parent::fullQuoteStr($string, $table, $allowNull);
+		if ($allowNull && $string === NULL) {
+			return 'NULL';
+		}
+
+		return '\'' . $this->quoteString($string, $table) . '\'';
 	}
+
+	/**
+	 * Will fullquote all values in the one-dimensional array so they are ready to "implode" for an sql query.
+	 *
+	 * @param array $array Array with values (either associative or non-associative array)
+	 * @param string $table Table name for which to quote
+	 * @param boolean|array $noQuote List/array of keys NOT to quote (eg. SQL functions) - ONLY for associative arrays
+	 * @param boolean $allowNull Whether to allow NULL values
+	 *
+     * @return array The input array with the values quoted
+	 * @see cleanIntArray()
+	 */
+	public function fullQuoteArray($array, $table, $noQuote = FALSE, $allowNull = FALSE) {
+		if (is_string($noQuote)) {
+			$noQuote = explode(',', $noQuote);
+		} elseif (!is_array($noQuote)) {
+			$noQuote = FALSE;
+		}
+		foreach ($array as $key => $value) {
+			if ($noQuote === FALSE || !in_array($key, $noQuote)) {
+				$array[$key] = $this->fullQuoteString($value, $table, $allowNull);
+			}
+		}
+		return $array;
+	}
+
 
 	/**
 	 * Substitution for PHP function "addslashes()"
@@ -700,13 +1257,27 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 *         single quotes yourself you should rather use ->fullQuoteStr()!
 	 *
 	 * @param string $string Input string
-	 * @param string $table  Table name for which to quote string. Just enter the table that the field-value is selected from
+	 *
+	 * @internal             param string $table Table name for which to quote string. Just enter the table that the field-value is selected from
 	 *                       (and any DBAL will look up which handler to use and then how to quote the string!).
 	 *
 	 * @return string Output string; Quotes (" / ') and \ will be backslashed (or otherwise based on DBAL handler)
 	 */
-	public function quoteString($string, $table) {
-		return parent::quoteStr($string, $table);
+	public function quoteString($string) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$quotedResult = $this->quote($string);
+
+		if ($quotedResult[0] == '\'') {
+			$quotedResult = substr($quotedResult, 1);
+		}
+		if ($quotedResult[strlen($quotedResult) - 1] == '\'') {
+			$quotedResult = substr($quotedResult, 0, strlen($quotedResult) - 1);
+		}
+
+		return $quotedResult;
 	}
 
 	/**
@@ -720,7 +1291,11 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @see quoteStr()
 	 */
 	public function escapeStringForLike($string, $table) {
-		return parent::escapeStrForLike($string, $table);
+		if (!$this->isConnected()) {
+			$this->connectDatabase();
+		}
+
+		return $this->quote($string);
 	}
 
 	/**
@@ -733,7 +1308,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @see cleanIntList()
 	 */
 	public function cleanIntegerArray(array $integerArray) {
-		return parent::cleanIntArray($integerArray);
+		return array_map('intval', $integerArray);
 	}
 
 	/**
@@ -747,7 +1322,104 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @see cleanIntArray()
 	 */
 	public function cleanIntegerList($list) {
-		return parent::cleanIntList($list);
+		return implode(',', GeneralUtility::intExplode(',', $list));
+	}
+
+	/**
+	 * Removes the prefix "ORDER BY" from the input string.
+	 * This function is used when you call the exec_SELECTquery() function and want to pass the ORDER BY parameter by can't guarantee that "ORDER BY" is not prefixed.
+	 * Generally; This function provides a work-around to the situation where you cannot pass only the fields by which to order the result.
+	 *
+	 * @param string $string eg. "ORDER BY title, uid
+	 *
+*@return string eg. "title, uid
+	 * @see exec_SELECTquery(), stripGroupBy()
+	 */
+	public function stripOrderBy($string) {
+		return preg_replace('/^(?:ORDER[[:space:]]*BY[[:space:]]*)+/i', '', trim($string));
+	}
+
+	/**
+	 * Removes the prefix "GROUP BY" from the input string.
+	 * This function is used when you call the SELECTquery() function and want to pass the GROUP BY parameter by can't guarantee that "GROUP BY" is not prefixed.
+	 * Generally; This function provides a work-around to the situation where you cannot pass only the fields by which to order the result.
+	 *
+	 * @param string $string eg. "GROUP BY title, uid
+	 *
+*@return string eg. "title, uid
+	 * @see exec_SELECTquery(), stripOrderBy()
+	 */
+	public function stripGroupBy($string) {
+		return preg_replace('/^(?:GROUP[[:space:]]*BY[[:space:]]*)+/i', '', trim($string));
+	}
+
+	/**
+	 * Takes the last part of a query, eg. "... uid=123 GROUP BY title ORDER BY title LIMIT 5,2" and splits each part into a table (WHERE, GROUPBY, ORDERBY, LIMIT)
+	 * Work-around function for use where you know some userdefined end to an SQL clause is supplied and you need to separate these factors.
+	 *
+	 * @param string $string Input string
+	 *
+*@return array
+	 */
+	public function splitGroupOrderLimit($string) {
+		// Prepending a space to make sure "[[:space:]]+" will find a space there
+		// for the first element.
+		$string = ' ' . $string;
+		// Init output array:
+		$wgolParts = array(
+			'WHERE' => '',
+			'GROUPBY' => '',
+			'ORDERBY' => '',
+			'LIMIT' => ''
+		);
+		// Find LIMIT
+		$reg = array();
+		if (preg_match('/^(.*)[[:space:]]+LIMIT[[:space:]]+([[:alnum:][:space:],._]+)$/i', $string, $reg)) {
+			$wgolParts['LIMIT'] = trim($reg[2]);
+			$string = $reg[1];
+		}
+		// Find ORDER BY
+		$reg = array();
+		if (preg_match('/^(.*)[[:space:]]+ORDER[[:space:]]+BY[[:space:]]+([[:alnum:][:space:],._]+)$/i', $string, $reg)) {
+			$wgolParts['ORDERBY'] = trim($reg[2]);
+			$string = $reg[1];
+		}
+		// Find GROUP BY
+		$reg = array();
+		if (preg_match('/^(.*)[[:space:]]+GROUP[[:space:]]+BY[[:space:]]+([[:alnum:][:space:],._]+)$/i', $string, $reg)) {
+			$wgolParts['GROUPBY'] = trim($reg[2]);
+			$string = $reg[1];
+		}
+		// Rest is assumed to be "WHERE" clause
+		$wgolParts['WHERE'] = $string;
+		return $wgolParts;
+	}
+
+	/**
+	 * Returns the date and time formats compatible with the given database table.
+	 *
+	 * @param string $table Table name for which to return an empty date. Just enter the table that the field-value is selected from (and any DBAL will look up which handler to use and then how date and time should be formatted).
+	 * @return array
+	 */
+	public function getDateTimeFormats($table) {
+		return array(
+			'date' => array(
+				'empty' => '0000-00-00',
+				'format' => 'Y-m-d'
+			),
+			'datetime' => array(
+				'empty' => '0000-00-00 00:00:00',
+				'format' => 'Y-m-d H:i:s'
+			)
+		);
+	}
+
+	/**
+	 * @return int
+	 * @deprecated
+	 */
+	public function sql_errno(){
+		return $this->getErrorCode();
 	}
 
 	/**
@@ -757,7 +1429,15 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getErrorCode() {
-		return (int)parent::sql_errno();
+		return $this->link->errorCode();
+	}
+
+	/**
+	 * @return string
+	 * @deprecated
+	 */
+	public function sql_error(){
+		return $this->getErrorMessage();
 	}
 
 	/**
@@ -767,78 +1447,124 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function getErrorMessage() {
-		return parent::sql_error();
+		$errorMsg = $this->link->errorInfo();
+
+		return $errorMsg[0] === '00000' ? '' : $errorMsg;
 	}
 
 	/**
 	 * Returns the number of selected rows.
 	 *
-	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
+	 * @param boolean|\Doctrine\DBAL\Driver\Statement $stmt
 	 *
 	 * @return integer Number of resulting rows
-	 * @api
 	 */
-	public function getResultRowCount($res) {
-		return parent::sql_num_rows($res);
+	public function getResultRowCount($stmt) {
+		if ($this->debugCheckRecordset($stmt)) {
+			$result = $stmt->rowCount();
+		} else {
+			$result = FALSE;
+		}
+
+		return $result;
 	}
 
 	/**
 	 * Get the ID generated from the previous INSERT operation
 	 *
+	 * @param null $tableName
+	 *
 	 * @return integer The uid of the last inserted record.
 	 * @api
 	 */
-	public function getLastInsertId() {
-		return (int)parent::sql_insert_id();
+	public function getLastInsertId($tableName = NULL) {
+		if ($this->getDatabaseDriver() === 'pdo_pgsql') {
+			return (int)$this->link->lastInsertId($tableName . '_uid_seq');
+		} else {
+			return (int)$this->link->lastInsertId();
+		}
 	}
 
 	/**
 	 * Returns the number of rows affected by the last INSERT, UPDATE or DELETE query
 	 *
-	 * @return integer Number of rows affected by last query
+	 * @return int
+	 * @api
 	 */
 	public function getAffectedRows() {
-		return (int)parent::sql_affected_rows();
+		return (int)$this->affectedRows;
 	}
 
 	/**
 	 * Returns an associative array that corresponds to the fetched row, or FALSE if there are no more rows.
-	 * MySQLi fetch_assoc() wrapper function
+	 * Wrapper function for Statement::fetch(\PDO::FETCH_ASSOC)
 	 *
-	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
+	 * @param \Doctrine\DBAL\Driver\Statement $stmt A PDOStatement object
 	 *
-	 * @return array|boolean Associative array of result row.
+	 * @return boolean|array Associative array of result row.
 	 * @api
 	 */
-	public function fetchAssoc($res) {
-		return parent::sql_fetch_assoc($res);
+	public function fetchAssoc($stmt) {
+		if ($this->debugCheckRecordset($stmt)) {
+			return $stmt->fetch(\PDO::FETCH_ASSOC);
+		} else {
+			return FALSE;
+		}
+	}
+
+	/**
+	 * Returns an array that corresponds to the fetched row, or FALSE if there are no more rows.
+	 * The array contains only a single requested column from the next row in the result set
+	 * Wrapper function for Statement::fetch(\PDO::FETCH_COLUMN)
+	 *
+	 * @param \Doctrine\DBAL\Driver\Statement $stmt A PDOStatement object
+	 *
+	 * @param                                 $index 0-indexed number of the column you wish to retrieve from the row. If no value is supplied it fetches the first column.
+	 *
+	 * @return boolean|array Array with result rows.
+	 * @api
+	 */
+	public function fetchColumn($stmt, $index = 0) {
+		if ($this->debugCheckRecordset($stmt)) {
+			return $stmt->fetchColumn($index);
+		} else {
+			return FALSE;
+		}
 	}
 
 	/**
 	 * Returns an array that corresponds to the fetched row, or FALSE if there are no more rows.
 	 * The array contains the values in numerical indices.
-	 * MySQLi fetch_row() wrapper function
+	 * Wrapper function for Statement::fetch(\PDO::FETCH_NUM)
 	 *
-	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
+	 * @param \Doctrine\DBAL\Driver\Statement $stmt A PDOStatement object
 	 *
-	 * @return array|boolean Array with result rows.
+	 * @return boolean|array Array with result rows.
 	 * @api
 	 */
-	public function fetchRow($res) {
-		return parent::sql_fetch_row($res);
+	public function fetchRow($stmt) {
+		if ($this->debugCheckRecordset($stmt)) {
+			return $stmt->fetch(\PDO::FETCH_NUM);
+		} else {
+			return FALSE;
+		}
 	}
 
 	/**
 	 * Free result memory
-	 * free_result() wrapper function
+	 * Wrapper function for Doctrine/PDO closeCursor()
 	 *
-	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
+	 * @param boolean|\Doctrine\DBAL\Driver\Statement $stmt A PDOStatement
 	 *
-	 * @return boolean Returns TRUE on success or FALSE on failure.
+	 * @return boolean Returns NULL on success or FALSE on failure.
 	 * @api
 	 */
-	public function freeResult($res) {
-		return parent::sql_free_result($res);
+	public function freeResult($stmt) {
+		if ($this->debugCheckRecordset($stmt) && is_object($stmt)) {
+			return $stmt->closeCursor();
+		} else {
+			return FALSE;
+		}
 	}
 
 	/**
@@ -851,21 +1577,66 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @api
 	 */
 	public function dataSeek($res, $seek) {
-		return parent::sql_data_seek($res, $seek);
 	}
 
 	/**
 	 * Get the type of the specified field in a result
 	 * mysql_field_type() wrapper function
 	 *
-	 * @param boolean|\mysqli_result|object $res     MySQLi result object / DBAL object
-	 * @param integer                       $pointer Field index.
+	 * @param boolean|\Doctrine\DBAL\Driver\Statement $stmt   A PDOStatement object
+	 * @param                                         $table
+	 * @param integer                                 $column Field index.
 	 *
 	 * @return string Returns the name of the specified field index, or FALSE on error
-	 * @api
 	 */
-	public function getFieldType($res, $pointer) {
-		return parent::sql_field_type($res, $pointer);
+	public function getFieldType($stmt, $table, $column) {
+		// mysql_field_type compatibility map
+		// taken from: http://www.php.net/manual/en/mysqli-result.fetch-field-direct.php#89117
+		// Constant numbers see http://php.net/manual/en/mysqli.constants.php
+
+		$mysqlDataTypeHash = array(
+			'boolean'      => 'boolean',
+			'smallint'     => 'smallint',
+			'integer'      => 'int',
+			'float'        => 'float',
+			'double'       => 'double',
+			'timestamp'    => 'timestamp',
+			'bigint'       => 'bigint',
+			'mediumint'    => 'mediumint',
+			'date'         => 'date',
+			'time'         => 'time',
+			'datetime'     => 'datetime',
+			'text'         => 'varchar',
+			'string'       => 'varchar',
+			'decimal'      => 'decimal',
+			'blob'         => 'blob',
+			'guid'         => 'guid',
+			'object'       => 'object',
+			'datetimetz'   => 'datetimetz',
+			'json_array'   => 'json_array',
+			'simple_array' => 'simple_array',
+			'array'        => 'array',
+		);
+
+		if ($this->debugCheckRecordset($stmt)) {
+			if (count($this->schema->getTables()) === 0) {
+				$this->schema = $this->link->getSchemaManager()->createSchema();
+			}
+
+			$metaInfo = $this->schema
+				->getTable($table)
+				->getColumn($column)
+				->getType()
+				->getName();
+
+			if ($metaInfo === FALSE) {
+				return FALSE;
+			}
+
+			return $mysqlDataTypeHash[$metaInfo];
+		} else {
+			return FALSE;
+		}
 	}
 
 	/**
@@ -879,7 +1650,19 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @throws \RuntimeException
 	 */
 	public function listDatabases() {
-		return parent::admin_get_dbs();
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$databases = $this->schemaManager->listDatabases();
+		if (empty($databases)) {
+			throw new \RuntimeException(
+				'MySQL Error: Cannot get databases: "' . $this->getErrorMessage() . '"!',
+				1378457171
+			);
+		}
+
+		return $databases;
 	}
 
 	/**
@@ -890,7 +1673,28 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @return array Array with tablenames as key and arrays with status information as value
 	 */
 	public function listTables() {
-		return parent::admin_get_tables();
+		$tables = array();
+		$stmt = $this->adminQuery('SHOW TABLE STATUS FROM `' . $this->getDatabaseName() . '`');
+		if ($stmt !== FALSE) {
+			// TODO: Abstract fetch here aswell
+			while ($theTable = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+				$tables[$theTable['Name']] = $theTable;
+			}
+		}
+
+		// TODO: Figure out how to use this
+//		$testTables = array();
+//		$tables = $this->schema->listTables();
+//		if ($tables !== FALSE) {
+//			foreach ($tables as $table) {
+//				$testTables[$table->getName()] = array(
+//													'columns' => $table->getColumns(),
+//													'indices' => $table->getIndexes()
+//												);
+//			}
+//		}
+
+		return $tables;
 	}
 
 	/**
@@ -906,7 +1710,20 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @return array Field information in an associative array with fieldname => field row
 	 */
 	public function listFields($tableName) {
-		return parent::admin_get_fields($tableName);
+		$fields = array();
+		// TODO: Figure out if we could use the function $this->schema->listTableColumns($tableName);
+		//       The result is a different from the current. We need to adjust assembleFieldDefinition() from
+		//       SqlSchemaMigrationService
+		$stmt = $this->adminQuery('SHOW COLUMNS FROM `' . $tableName . '`');
+
+		if ($stmt !== FALSE) {
+			while ($fieldRow = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+				$fields[$fieldRow['Field']] = $fieldRow;
+			}
+			$stmt->closeCursor();
+		}
+
+		return $fields;
 	}
 
 	/**
@@ -918,7 +1735,21 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @return array Key information in a numeric array
 	 */
 	public function listKeys($tableName) {
-		return parent::admin_get_keys($tableName);
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$keys = array();
+
+		$stmt = $this->adminQuery('SHOW KEYS FROM `' . $tableName . '`');
+		if ($stmt !== FALSE) {
+			while ($keyRow = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+				$keys[] = $keyRow;
+			}
+			$stmt->closeCursor();
+		}
+
+		return $keys;
 	}
 
 	/**
@@ -934,7 +1765,99 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 * @return array Array with Charset as key and an array of "Charset", "Description", "Default collation", "Maxlen" as values
 	 */
 	public function listDatabaseCharsets() {
-		return parent::admin_get_charsets();
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$output = array();
+		$stmt = $this->adminQuery('SHOW CHARACTER SET');
+
+		if ($stmt !== FALSE) {
+			while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+				$output[$row['Charset']] = $row;
+			}
+			$stmt->closeCursor();
+		}
+
+		return $output;
+	}
+
+	/**
+	 * This returns the count of the tables from the selected database
+	 *
+	 * @return int
+	 */
+	public function countTables() {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$result[0] = -1;
+		$sql = 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = :databaseName';
+
+		$statement = $this->link->prepare($sql);
+		$statement->bindValue('databaseName', $this->getDatabaseName());
+		$isQuerySuccess = $statement->execute();
+
+		if ($isQuerySuccess !== FALSE) {
+			$result = $statement->fetchAll(\PDO::FETCH_COLUMN);
+		}
+
+		return $result[0];
+	}
+
+
+	/**
+	 * Returns a WHERE clause that can find a value ($value) in a list field ($field)
+	 * For instance a record in the database might contain a list of numbers,
+	 * "34,234,5" (with no spaces between). This query would be able to select that
+	 * record based on the value "34", "234" or "5" regardless of their position in
+	 * the list (left, middle or right).
+	 * The value must not contain a comma (,)
+	 * Is nice to look up list-relations to records or files in TYPO3 database tables.
+	 *
+	 * @param string $field Field name
+	 * @param string $value Value to find in list
+	 * @param string $table Table in which we are searching (for DBAL detection of quoteStr() method)
+	 * @return string WHERE clause for a query
+	 * @throws \InvalidArgumentException
+	 */
+	public function listQuery($field, $value, $table) {
+		$value = (string)$value;
+		if (strpos($value, ',') !== FALSE) {
+			throw new \InvalidArgumentException('$value must not contain a comma (,) in $this->listQuery() !', 1294585862);
+		}
+		$pattern = $this->quoteString($value, $table);
+		$where = 'FIND_IN_SET(\'' . $pattern . '\',' . $field . ')';
+		return $where;
+	}
+
+	/**
+	 * Returns a WHERE clause which will make an AND or OR search for the words in the $searchWords array in any of the fields in array $fields.
+	 *
+	 * @param array $searchWords Array of search words
+	 * @param array $fields Array of fields
+	 * @param string $table Table in which we are searching (for DBAL detection of quoteStr() method)
+	 * @param string $constraint How multiple search words have to match ('AND' or 'OR')
+	 * @return string WHERE clause for search
+	 */
+	public function searchQuery($searchWords, $fields, $table, $constraint = self::AND_Constraint) {
+		switch ($constraint) {
+			case self::OR_Constraint:
+				$constraint = 'OR';
+				break;
+			default:
+				$constraint = 'AND';
+		}
+
+		$queryParts = array();
+		foreach ($searchWords as $sw) {
+			$like = ' LIKE \'%' . $this->quoteString($sw, $table) . '%\'';
+			$queryParts[] = $table . '.' . implode(($like . ' OR ' . $table . '.'), $fields) . $like;
+		}
+		$query = '(' . implode(') ' . $constraint . ' (', $queryParts) . ')';
+
+		return $query;
 	}
 
 	/**
@@ -944,7 +1867,314 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Legacy\Datab
 	 *
 	 * @return boolean TRUE if the  record set is valid, FALSE otherwise
 	 */
-	private function debugCheckRecordset($res) {
-		return parent::debug_check_recordset($res);
+	protected function debugCheckRecordset($stmt) {
+		if ($stmt !== FALSE) {
+			return TRUE;
+		}
+		$msg = 'Invalid database result detected';
+		$trace = debug_backtrace();
+		array_shift($trace);
+		$cnt = count($trace);
+		for ($i = 0; $i < $cnt; $i++) {
+			// Complete objects are too large for the log
+			if (isset($trace['object'])) {
+				unset($trace['object']);
+			}
+		}
+		$msg .= ': function TYPO3\\CMS\\Core\\Database\\DatabaseConnection->' . $trace[0]['function'] . ' called from file ' . substr($trace[0]['file'], (strlen(PATH_site) + 2)) . ' in line ' . $trace[0]['line'];
+		GeneralUtility::sysLog(
+			$msg . '. Use a devLog extension to get more details.',
+			'Core/t3lib_db',
+			GeneralUtility::SYSLOG_SEVERITY_ERROR
+		);
+		// Send to devLog if enabled
+		if (TYPO3_DLOG) {
+			$debugLogData = array(
+				'SQL Error' => $this->getErrorMessage(),
+				'Backtrace' => $trace
+			);
+			if ($this->debug_lastBuiltQuery) {
+				$debugLogData = array('SQL Query' => $this->debug_lastBuiltQuery) + $debugLogData;
+			}
+			GeneralUtility::devLog($msg . '.', 'Core/t3lib_db', 3, $debugLogData);
+		}
+
+		return FALSE;
+	}
+
+	/**
+	 * Escaping and quoting values for SQL statements.
+	 *
+	 * @param string  $string    Input string
+	 * @param boolean $allowNull Whether to allow NULL values
+	 *
+	 * @return string Output string; Wrapped in single quotes and quotes in the string (" / ') and \ will be backslashed (or otherwise based on DBAL handler)
+	 * @api
+	 */
+	public function quote($string, $allowNull = FALSE) {
+		if ($allowNull && $string === NULL) {
+			return 'NULL';
+		}
+
+		return $this->link->quote($string);
+	}
+
+	/**
+	 * Returns a qualified identifier for $columnName in $tableName
+	 *
+	 * Example:
+	 * <code><br>
+	 * // if no $tableName is given it returns: `column`<br>
+	 * $GLOBALS['TYPO3_DB']->quoteTable('column');<br><br>
+	 *
+	 * // if $tableName is given it returns: `pages`.`column`<br>
+	 * $GLOBALS['TYPO3_DB']->quoteTable('column', 'pages');<br>
+	 * </code>
+	 *
+	 * @param string $columnName
+	 * @param string $tableName
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function quoteColumn($columnName, $tableName = NULL) {
+		return ($tableName ? $this->quoteTable($tableName) . '.' : '') .
+				$this->quoteIdentifier($columnName);
+	}
+
+	/**
+	 * Returns a qualified identifier for $tablename
+	 *
+	 * Example:
+	 * <code><br>
+	 * // returns: `pages`<br>
+	 * $GLOBALS['TYPO3_DB']->quoteTable('pages');<br>
+	 * </code>
+	 *
+	 * @param string $tableName
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function quoteTable($tableName) {
+		return $this->quoteIdentifier($tableName);
+	}
+
+	/**
+	 * Custom quote identifier method
+	 *
+	 * Example:
+	 * <code><br>
+	 * // returns `column`<br>
+	 * $GLOBALS['TYPO3_DB']->quoteIdentifier('column');<br>
+	 * </code>
+	 *
+	 * @param string $identifier
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function quoteIdentifier($identifier) {
+		return '`' . $identifier . '`';
+	}
+
+	/**
+	 * Checks if the current connection character set has the same value
+	 * as the connectionCharset variable.
+	 *
+	 * To determine the character set these MySQL session variables are
+	 * checked: character_set_client, character_set_results and
+	 * character_set_connection.
+	 *
+	 * If the character set does not match or if the session variables
+	 * can not be read a RuntimeException is thrown.
+	 *
+	 * @return void
+	 * @throws \RuntimeException
+	 */
+	protected function checkConnectionCharset() {
+		$sessionResult = $this->adminQuery('SHOW SESSION VARIABLES LIKE \'character_set%\'');
+
+		if ($sessionResult === FALSE) {
+			GeneralUtility::sysLog(
+				'Error while retrieving the current charset session variables from the database: ' . $this->getErrorMessage(),
+				'Core',
+				GeneralUtility::SYSLOG_SEVERITY_ERROR
+			);
+			throw new \RuntimeException(
+				'TYPO3 Fatal Error: Could not determine the current charset of the database.',
+				1381847136
+			);
+		}
+
+		$charsetVariables = array();
+		while (($row = $this->fetchRow($sessionResult)) !== FALSE) {
+			$variableName = $row[0];
+			$variableValue = $row[1];
+			$charsetVariables[$variableName] = $variableValue;
+		}
+		$this->freeResult($sessionResult);
+
+		// These variables are set with the "Set names" command which was
+		// used in the past. This is why we check them.
+		$charsetRequiredVariables = array(
+			'character_set_client',
+			'character_set_results',
+			'character_set_connection',
+		);
+
+		$hasValidCharset = TRUE;
+		foreach ($charsetRequiredVariables as $variableName) {
+			if (empty($charsetVariables[$variableName])) {
+				GeneralUtility::sysLog(
+					'A required session variable is missing in the current MySQL connection: ' . $variableName,
+					'Core',
+					GeneralUtility::SYSLOG_SEVERITY_ERROR
+				);
+				throw new \RuntimeException(
+					'TYPO3 Fatal Error: Could not determine the value of the database session variable: ' . $variableName,
+					1381847779
+				);
+			}
+
+			if ($charsetVariables[$variableName] !== $this->getDatabaseCharset()) {
+				$hasValidCharset = FALSE;
+				break;
+			}
+		}
+
+		if (!$hasValidCharset) {
+			throw new \RuntimeException(
+				'It looks like the character set ' . $this->getDatabaseCharset() . ' is not used for this connection even though it is configured as connection charset. ' .
+				'This TYPO3 installation is using the $GLOBALS[\'TYPO3_CONF_VARS\'][\'SYS\'][\'setDBinit\'] property with the following value: "' .
+				$GLOBALS['TYPO3_CONF_VARS']['SYS']['setDBinit'] . '". Please make sure that this command does not overwrite the configured charset. ' .
+				'Please note that for the TYPO3 database everything other than utf8 is unsupported since version 4.7.',
+				1389697515
+			);
+		}
+	}
+
+	/******************************
+	 *
+	 * Debugging
+	 *
+	 ******************************/
+
+	/**
+	 * Debug function: Outputs error if any
+	 *
+	 * @param string $func Function calling debug()
+	 * @param string $query Last query if not last built query
+	 * @return void
+	 * @todo Define visibility
+	 */
+	public function debug($func, $query = '') {
+		$error = $this->getErrorMessage();
+		if ($error || (int)$this->debugOutput === 2) {
+			DebugUtility::debug(
+				array(
+					'caller' => 'Konafets\\DoctrineDbal\\Persistence\\Doctrine\\DatabaseConnection::' . $func,
+					'ERROR' => $error,
+					'lastBuiltQuery' => $query ? $query : $this->debug_lastBuiltQuery,
+					'debug_backtrace' => DebugUtility::debugTrail()
+				),
+				$func,
+				is_object($GLOBALS['error']) && @is_callable(array($GLOBALS['error'], 'debug'))
+					? ''
+					: 'DB Error'
+			);
+		}
+	}
+
+	/**
+	 * Explain select queries
+	 * If $this->explainOutput is set, SELECT queries will be explained here. Only queries with more than one possible result row will be displayed.
+	 * The output is either printed as raw HTML output or embedded into the TS admin panel (checkbox must be enabled!)
+	 *
+	 * TODO: Feature is not DBAL-compliant
+	 *
+	 * @param string $query SQL query
+	 * @param string $from_table Table(s) from which to select. This is what comes right after "FROM ...". Required value.
+	 * @param integer $row_count Number of resulting rows
+	 * @return boolean TRUE if explain was run, FALSE otherwise
+	 */
+	protected function explain($query, $from_table, $row_count) {
+		$debugAllowedForIp = GeneralUtility::cmpIP(
+			GeneralUtility::getIndpEnv('REMOTE_ADDR'),
+			$GLOBALS['TYPO3_CONF_VARS']['SYS']['devIPmask']
+		);
+		if (
+			(int)$this->explainOutput == 1
+			|| ((int)$this->explainOutput == 2 && $debugAllowedForIp)
+		) {
+			// Raw HTML output
+			$explainMode = 1;
+		} elseif ((int)$this->explainOutput == 3 && is_object($GLOBALS['TT'])) {
+			// Embed the output into the TS admin panel
+			$explainMode = 2;
+		} else {
+			return FALSE;
+		}
+		$error = $this->getErrorMessage();
+		$trail = \TYPO3\CMS\Core\Utility\DebugUtility::debugTrail();
+		$explain_tables = array();
+		$explain_output = array();
+		$res = $this->adminQuery('EXPLAIN ' . $query, $this->link);
+		if (is_a($res, '\\mysqli_result')) {
+			while ($tempRow = $this->fetchAssoc($res)) {
+				$explain_output[] = $tempRow;
+				$explain_tables[] = $tempRow['table'];
+			}
+			$this->freeResult($res);
+		}
+		$indices_output = array();
+		// Notice: Rows are skipped if there is only one result, or if no conditions are set
+		if (
+			$explain_output[0]['rows'] > 1
+			|| GeneralUtility::inList('ALL', $explain_output[0]['type'])
+		) {
+			// Only enable output if it's really useful
+			$debug = TRUE;
+			foreach ($explain_tables as $table) {
+				$tableRes = $this->adminQuery('SHOW TABLE STATUS LIKE \'' . $table . '\'');
+				$isTable = $this->getResultRowCount($tableRes);
+				if ($isTable) {
+					$res = $this->adminQuery('SHOW INDEX FROM ' . $table, $this->link);
+					if (is_a($res, '\\mysqli_result')) {
+						while ($tempRow = $this->fetchAssoc($res)) {
+							$indices_output[] = $tempRow;
+						}
+						$this->freeResult($res);
+					}
+				}
+				$this->freeResult($tableRes);
+			}
+		} else {
+			$debug = FALSE;
+		}
+		if ($debug) {
+			if ($explainMode) {
+				$data = array();
+				$data['query'] = $query;
+				$data['trail'] = $trail;
+				$data['row_count'] = $row_count;
+				if ($error) {
+					$data['error'] = $error;
+				}
+				if (count($explain_output)) {
+					$data['explain'] = $explain_output;
+				}
+				if (count($indices_output)) {
+					$data['indices'] = $indices_output;
+				}
+				if ($explainMode == 1) {
+					\TYPO3\CMS\Core\Utility\DebugUtility::debug($data, 'Tables: ' . $from_table, 'DB SQL EXPLAIN');
+				} elseif ($explainMode == 2) {
+					$GLOBALS['TT']->setTSselectQuery($data);
+				}
+			}
+			return TRUE;
+		}
+		return FALSE;
 	}
 }
