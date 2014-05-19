@@ -540,6 +540,19 @@ class DatabaseConnection {
 	}
 
 	/**
+	 * Returns the platform object
+	 *
+	 * @return \Doctrine\DBAL\Platforms\AbstractPlatform
+	 */
+	public function getPlatform() {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		return $this->platform;
+	}
+
+	/**
 	 * Select a SQL database
 	 *
 	 * @throws \Konafets\DoctrineDbal\Exception\ConnectionException

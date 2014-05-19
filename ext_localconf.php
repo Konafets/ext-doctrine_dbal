@@ -4,3 +4,4 @@ if (!defined('TYPO3_MODE')) {
 }
 
 $GLOBALS['TYPO3_CONF_VARS']['SYS']['Objects']['TYPO3\\CMS\\Core\\Database\\DatabaseConnection'] = array('className' => 'Konafets\\DoctrineDbal\\Persistence\\Legacy\\DatabaseConnection');
+$GLOBALS['TYPO3_CONF_VARS']['SYS']['Objects']['TYPO3\\CMS\\Install\\Service\\SqlSchemaMigrationService'] = array('className' => 'Konafets\\DoctrineDbal\\Install\\Service\\Legacy\\SqlSchemaMigrationService');
