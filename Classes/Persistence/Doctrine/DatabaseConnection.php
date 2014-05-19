@@ -386,6 +386,37 @@ class DatabaseConnection {
 	}
 
 	/**
+	 * Set persistent database connection
+	 *
+	 * @param boolean $persistentDatabaseConnection
+	 * @see http://php.net/manual/de/mysqli.persistconns.php
+	 */
+	public function setPersistentDatabaseConnection($persistentDatabaseConnection) {
+		$this->disconnectIfConnected();
+		$this->persistentDatabaseConnection = (bool)$persistentDatabaseConnection;
+	}
+
+	/**
+	 * Set connection compression. Might be an advantage, if SQL server is not on localhost
+	 *
+	 * @param bool $connectionCompression TRUE if connection should be compressed
+	 */
+	public function setConnectionCompression($connectionCompression) {
+		$this->disconnectIfConnected();
+		$this->connectionCompression = (bool)$connectionCompression;
+	}
+
+	/**
+	 * Set commands to be fired after connection was established
+	 *
+	 * @param array $commands List of SQL commands to be executed after connect
+	 */
+	public function setInitializeCommandsAfterConnect(array $commands) {
+		$this->disconnectIfConnected();
+		$this->initializeCommandsAfterConnect = $commands;
+	}
+
+	/**
 	 * Enables/Disables the storage of the last statement
 	 *
 	 * @param $value
