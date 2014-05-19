@@ -154,11 +154,6 @@ class PreparedStatement {
 	protected $parameterWrapToken;
 
 	/**
-	 * @var \Doctrine\DBAL\Connection
-	 */
-	protected $link;
-
-	/**
 	 * Creates a new PreparedStatement. Either $query or $queryComponents
 	 * should be used. Typically $query will be used by native MySQL TYPO3_DB
 	 * on a ready-to-be-executed query. On the other hand, DBAL will have
@@ -169,16 +164,14 @@ class PreparedStatement {
 	 *
 	 * @param string $query                 SQL query to be executed
 	 * @param string $table                 FROM table, used to call $GLOBALS['TYPO3_DB']->fullQuoteStr().
-	 * @param \Doctrine\DBAL\Connection       $link
 	 * @param array  $precompiledQueryParts Components of the query to be executed
 	 *
 	 * @access private
 	 */
-	public function __construct($query, $table, $link, array $precompiledQueryParts = array()) {
+	public function __construct($query, $table, array $precompiledQueryParts = array()) {
 		$this->query = $query;
 		$this->precompiledQueryParts = $precompiledQueryParts;
 		$this->table = $table;
-		$this->link = $link;
 		$this->parameters = array();
 
 		// Test if named placeholders are used
@@ -190,7 +183,6 @@ class PreparedStatement {
 		}
 
 		$this->parameterWrapToken = $this->generateParameterWrapToken();
-		$this->link = $link;
 	}
 
 	/**

@@ -1182,7 +1182,7 @@ class DatabaseConnection {
 		$query = $this->createSelectQuery($selectFields, $fromTable, $whereClause, $groupBy, $orderBy, $limit);
 
 		/** @var $preparedStatement \Konafets\DoctrineDbal\Persistence\Doctrine\PreparedStatement */
-		$preparedStatement = GeneralUtility::makeInstance('Konafets\\DoctrineDbal\\Persistence\\Doctrine\\PreparedStatement', $query, $fromTable, $this->link, array());
+		$preparedStatement = GeneralUtility::makeInstance('Konafets\\DoctrineDbal\\Persistence\\Doctrine\\PreparedStatement', $query, $fromTable, array());
 
 		// Bind values to parameters
 		foreach ($inputParameters as $key => $value) {
