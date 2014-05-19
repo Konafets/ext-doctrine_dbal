@@ -694,6 +694,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * Returns the error status on the last query() execution
 	 *
 	 * @return string MySQLi error string.
+	 * @deprecated
 	 */
 	public function sql_error() {
 		return $this->getErrorMessage();
@@ -703,6 +704,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * Returns the error number on the last query() execution
 	 *
 	 * @return integer MySQLi error number
+	 * @deprecated
 	 */
 	public function sql_errno() {
 		return $this->getErrorCode();
