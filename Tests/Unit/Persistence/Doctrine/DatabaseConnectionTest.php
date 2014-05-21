@@ -720,8 +720,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 * @expectedException \Doctrine\DBAL\DBALException
 	 * @expectedExceptionMessage SQLSTATE[42S22]: Column not found: 1054 Unknown column 'baz' in 'where clause'
 	 */
@@ -736,8 +734,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function sqlFreeResultReturnsTrue() {
 		$this->assertInstanceOf(
@@ -758,8 +754,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 * @expectedException \Doctrine\DBAL\DBALException
 	 * @expectedExceptionMessage SQLSTATE[42S22]: Column not found: 1054 Unknown column 'test' in 'field list'
 	 */
@@ -778,8 +772,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 * @expectedException \Doctrine\DBAL\DBALException
 	 * @expectedExceptionMessage SQLSTATE[42S22]: Column not found: 1054 Unknown column 'test' in 'field list'
 	 */
@@ -836,7 +828,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	/**
 	 * @test
 	 *
-	 * @return void
 	 * @expectedException \Doctrine\DBAL\DBALException
 	 * @expectedExceptionMessage SQLSTATE[42S22]: Column not found: 1054 Unknown column 'test' in 'where clause'
 	 */

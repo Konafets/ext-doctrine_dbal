@@ -53,8 +53,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * Set the test up
-	 *
-	 * @return void
 	 */
 	public function setUp() {
 		$this->subject = $GLOBALS['TYPO3_DB'];
@@ -72,8 +70,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * Tear the test down
-	 *
-	 * @return void
 	 */
 	public function tearDown() {
 		$this->subject->sql_query('DROP TABLE ' . $this->testTable . ';');
@@ -82,8 +78,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function selectDbReturnsTrue() {
 		$this->assertTrue($this->subject->sql_select_db());
@@ -93,7 +87,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 * @expectedException \RuntimeException
 	 * @expectedExceptionMessage TYPO3 Fatal Error: Cannot connect to the current database, "Foo"!
-	 * @return void
 	 */
 	public function selectDbReturnsFalse() {
 		$this->subject->setDatabaseName('Foo');
@@ -102,8 +95,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function sqlAffectedRowsReturnsCorrectAmountOfRows() {
 		$this->subject->exec_INSERTquery($this->testTable, array($this->testField => 'test'));
@@ -112,8 +103,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function sqlInsertIdReturnsCorrectId() {
 		$this->subject->exec_INSERTquery($this->testTable, array($this->testField => 'test'));
@@ -122,8 +111,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function noSqlError() {
 		$this->subject->exec_INSERTquery($this->testTable, array($this->testField => 'test'));
@@ -133,7 +120,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	/**
 	 * @test
 	 *
-	 * @return void
 	 */
 	public function sqlErrorWhenInsertIntoInexistentField() {
 		$this->subject->exec_INSERTquery($this->testTable, array('test' => 'test'));
@@ -142,8 +128,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function noSqlErrorCode() {
 		$this->subject->exec_INSERTquery($this->testTable, array($this->testField => 'test'));
@@ -153,7 +137,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	/**
 	 * @test
 	 *
-	 * @return void
 	 */
 	public function sqlErrorNoWhenInsertIntoInexistentField() {
 		$this->subject->exec_INSERTquery($this->testTable, array('test' => 'test'));
@@ -182,8 +165,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function connectDbConnectsToDatabaseWithoutErrors() {
 		$this->subject->connectDB();
@@ -216,8 +197,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 *
 	 * @param string $values
 	 * @param string $expectedResult
-	 *
-	 * @return void
 	 */
 	public function fullQuoteStrReturnsQuotedString($values, $expectedResult) {
 		$quotedStr = $this->subject->fullQuoteStr($values[0], $this->testTable, $values[1]);
@@ -339,8 +318,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 *
 	 * @param string $values
 	 * @param string $expectedResult
-	 *
-	 * @return void
 	 */
 	public function fullQuoteArrayQuotesArray($values, $expectedResult) {
 		$quotedResult = $this->subject->fullQuoteArray($values[0], $this->testTable, $values[1], $values[2]);
@@ -369,8 +346,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 *
 	 * @param string $string String to quote
 	 * @param string $expectedResult Quoted string we expect
-	 *
-	 * @return void
 	 */
 	public function quoteStrQuotesDoubleQuotesCorrectly($string, $expectedResult) {
 		$quotedString = $this->subject->quoteStr($string, $this->testTable);
@@ -396,8 +371,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 *
 	 * @param string $values
 	 * @param string $exptectedResult
-	 *
-	 * @return void
 	 */
 	public function cleanIntArrayReturnsCleanedArray($values, $exptectedResult) {
 		$cleanedResult = $this->subject->cleanIntArray($values);
@@ -406,8 +379,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function cleanIntListReturnsCleanedString() {
 		$str = '234,-434,4.3,0, 1';
@@ -417,8 +388,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function disconnectIfConnectedDisconnects() {
 		$this->assertTrue($this->subject->isConnected());
@@ -428,8 +397,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminQueryReturnsTrueForInsertQuery() {
 		$this->assertTrue($this->subject->admin_query('INSERT INTO ' . $this->testTable . ' (fieldblob) VALUES (\'foo\')'));
@@ -437,8 +404,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminQueryReturnsTrueForUpdateQuery() {
 		$this->assertTrue($this->subject->admin_query('INSERT INTO ' . $this->testTable . ' (fieldblob) VALUES (\'foo\')'));
@@ -448,8 +413,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminQueryReturnsTrueForDeleteQuery() {
 		$this->assertTrue($this->subject->admin_query('INSERT INTO ' . $this->testTable . ' (fieldblob) VALUES (\'foo\')'));
@@ -459,8 +422,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminQueryReturnsResultForSelectQuery() {
 		$this->assertTrue($this->subject->admin_query('INSERT INTO ' . $this->testTable . ' (fieldblob) VALUES (\'foo\')'));
@@ -472,8 +433,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminGetCharsetsReturnsArrayWithCharsets() {
 		$columnsRes = $this->subject->admin_query('SHOW CHARACTER SET');
@@ -488,8 +447,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminGetKeysReturnIndexKeysOfTable() {
 		$result = $this->subject->admin_get_keys($this->testTable);
@@ -498,8 +455,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminGetFieldsReturnFieldInformationsForTable() {
 		$result = $this->subject->admin_get_fields($this->testTable);
@@ -509,8 +464,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminGetTablesReturnAllTablesFromDatabase() {
 		$result = $this->subject->admin_get_tables();
@@ -520,8 +473,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function adminGetDbsReturnsAllDatabases() {
 		$databases = $this->subject->admin_query('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA');
@@ -537,8 +488,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function insertQueryCreateValidQuery() {
 		$fieldValues = array($this->testField => 'Foo');
@@ -549,8 +498,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function insertQueryCreateValidQueryFromMultipleValues() {
 		$fieldValues = array(
@@ -565,8 +512,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function insertMultipleRowsCreateValidQuery() {
 		$fields = array($this->testField, $this->testFieldSecond);
@@ -583,8 +528,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function updateQueryCreateValidQuery() {
 		$this->assertTrue(
@@ -601,8 +544,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function deleteQueryCreateValidQuery() {
 		$this->assertTrue(
@@ -618,8 +559,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function selectQueryCreateValidQuery() {
 		$this->assertTrue(
@@ -635,8 +574,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function selectQueryCreateValidQueryWithEmptyWhereClause() {
 		$this->assertTrue(
@@ -652,8 +589,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function selectQueryCreateValidQueryWithGroupByClause() {
 		$this->assertTrue(
@@ -670,8 +605,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function selectQueryCreateValidQueryWithOrderByClause() {
 		$this->assertTrue(
@@ -688,8 +621,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function selectQueryCreateValidQueryWithLimitClause() {
 		$this->assertTrue(
@@ -704,8 +635,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function selectSubQueryCreateValidQuery() {
 		$this->assertTrue(
@@ -721,8 +650,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function truncateQueryCreateValidQuery() {
 		$this->assertTrue(
@@ -737,8 +664,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function prepareSelectQueryCreateValidQuery() {
 		$this->assertTrue(
@@ -780,8 +705,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 *
 	 * @param string $sql
 	 * @param string $expectedResult
-	 *
-	 * @return void
 	 */
 	public function sqlNumRowsReturnsCorrectAmountOfRows($sql, $expectedResult) {
 		$this->assertTrue(
@@ -802,7 +725,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	/**
 	 * @test
 	 *
-	 * @return void
 	 */
 	public function sqlNumRowsReturnsFalse() {
 		$res = $this->subject->admin_query('SELECT * FROM ' . $this->testTable . ' WHERE test=\'baz\'');
@@ -812,8 +734,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * Prepares the test table for the fetch* Tests
-	 *
-	 * @return void
 	 */
 	protected function prepareTableForFetchTests() {
 		$this->assertTrue(
@@ -861,8 +781,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function sqlFetchAssocReturnsAssocArray() {
 		$this->prepareTableForFetchTests();
@@ -926,8 +844,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function sqlFetchRowReturnsNumericArray() {
 		$this->prepareTableForFetchTests();
@@ -948,7 +864,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	/**
 	 * @test
 	 *
-	 * @return void
 	 */
 	public function sqlFreeResultReturnsFalse() {
 		$this->assertTrue(
@@ -960,8 +875,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
 	 * @test
-	 *
-	 * @return void
 	 */
 	public function sqlFreeResultReturnsNull() {
 		$this->assertTrue(
@@ -1227,7 +1140,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @dataProvider stripOrderByForOrderByKeywordDataProvider
 	 * @param string $orderByClause The clause to test
 	 * @param string $expectedResult The expected result
-	 * @return void
 	 */
 	public function stripOrderByForOrderByKeyword($orderByClause, $expectedResult) {
 		/** @var \TYPO3\CMS\Core\Database\DatabaseConnection|\PHPUnit_Framework_MockObject_MockObject $subject */
@@ -1266,7 +1178,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @dataProvider stripGroupByForGroupByKeywordDataProvider
 	 * @param string $groupByClause The clause to test
 	 * @param string $expectedResult The expected result
-	 * @return void
 	 */
 	public function stripGroupByForGroupByKeyword($groupByClause, $expectedResult) {
 		/** @var \TYPO3\CMS\Core\Database\DatabaseConnection|\PHPUnit_Framework_MockObject_MockObject $subject */
@@ -1342,7 +1253,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @dataProvider cleanIntArrayDataProvider
 	 * @param array $exampleData The array to sanitize
 	 * @param array $expectedResult The expected result
-	 * @return void
 	 */
 	public function cleanIntArray($exampleData, $expectedResult) {
 		/** @var \TYPO3\CMS\Core\Database\DatabaseConnection $subject */
@@ -1350,5 +1260,4 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 		$sanitizedArray = $subject->cleanIntArray($exampleData);
 		$this->assertEquals($expectedResult, $sanitizedArray);
 	}
-
 }
