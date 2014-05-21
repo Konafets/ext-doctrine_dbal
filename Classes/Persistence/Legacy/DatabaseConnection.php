@@ -95,6 +95,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $fields_values Field values as key=>value pairs. Values will be escaped internally. Typically you would fill an array like "$insertFields" with 'fieldname'=>'value' and pass it to this function as argument.
 	 * @param boolean $no_quote_fields See fullQuoteArray()
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @deprecated
 	 */
 	public function exec_INSERTquery($table, $fields_values, $no_quote_fields = FALSE) {
 		$res = $this->query($this->INSERTquery($table, $fields_values, $no_quote_fields));
@@ -116,6 +117,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $rows Table rows. Each row should be an array with field values mapping to $fields
 	 * @param boolean $no_quote_fields See fullQuoteArray()
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @deprecated
 	 */
 	public function exec_INSERTmultipleRows($table, array $fields, array $rows, $no_quote_fields = FALSE) {
 		$res = $this->query($this->INSERTmultipleRows($table, $fields, $rows, $no_quote_fields));
@@ -138,6 +140,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $fields_values Field values as key=>value pairs. Values will be escaped internally. Typically you would fill an array like "$updateFields" with 'fieldname'=>'value' and pass it to this function as argument.
 	 * @param boolean $no_quote_fields See fullQuoteArray()
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @deprecated
 	 */
 	public function exec_UPDATEquery($table, $where, $fields_values, $no_quote_fields = FALSE) {
 		$res = $this->query($this->UPDATEquery($table, $where, $fields_values, $no_quote_fields));
@@ -157,6 +160,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $table Database tablename
 	 * @param string $where WHERE clause, eg. "uid=1". NOTICE: You must escape values in this argument with $this->fullQuoteStr() yourself!
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @deprecated
 	 */
 	public function exec_DELETEquery($table, $where) {
 		$res = $this->query($this->DELETEquery($table, $where));
@@ -181,6 +185,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $orderBy Optional ORDER BY field(s), if none, supply blank string.
 	 * @param string $limit Optional LIMIT value ([begin,]max), if none, supply blank string.
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @deprecated
 	 */
 	public function exec_SELECTquery($select_fields, $from_table, $where_clause, $groupBy = '', $orderBy = '', $limit = '') {
 		$query = $this->SELECTquery($select_fields, $from_table, $where_clause, $groupBy, $orderBy, $limit);
@@ -214,6 +219,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $limit Optional LIMIT value ([begin,]max), if none, supply blank string.
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
 	 * @see exec_SELECTquery()
+	 * @deprecated
 	 */
 	public function exec_SELECT_mm_query($select, $local_table, $mm_table, $foreign_table, $whereClause = '', $groupBy = '', $orderBy = '', $limit = '') {
 		$foreign_table_as = $foreign_table == $local_table ? $foreign_table . uniqid('_join') : '';
@@ -233,6 +239,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $queryParts Query parts array
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
 	 * @see exec_SELECTquery()
+	 * @deprecated
 	 */
 	public function exec_SELECT_queryArray($queryParts) {
 		return $this->exec_SELECTquery($queryParts['SELECT'], $queryParts['FROM'], $queryParts['WHERE'], $queryParts['GROUPBY'], $queryParts['ORDERBY'], $queryParts['LIMIT']);
@@ -249,6 +256,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $limit See exec_SELECTquery()
 	 * @param string $uidIndexField If set, the result array will carry this field names value as index. Requires that field to be selected of course!
 	 * @return array|NULL Array of rows, or NULL in case of SQL error
+	 * @deprecated
 	 */
 	public function exec_SELECTgetRows($select_fields, $from_table, $where_clause, $groupBy = '', $orderBy = '', $limit = '', $uidIndexField = '') {
 		$res = $this->exec_SELECTquery($select_fields, $from_table, $where_clause, $groupBy, $orderBy, $limit);
@@ -285,6 +293,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $orderBy Optional ORDER BY field(s), if none, supply blank string.
 	 * @param boolean $numIndex If set, the result will be fetched with sql_fetch_row, otherwise sql_fetch_assoc will be used.
 	 * @return array Single row or NULL if it fails.
+	 * @deprecated
 	 */
 	public function exec_SELECTgetSingleRow($select_fields, $from_table, $where_clause, $groupBy = '', $orderBy = '', $numIndex = FALSE) {
 		$res = $this->exec_SELECTquery($select_fields, $from_table, $where_clause, $groupBy, $orderBy, '1');
@@ -310,6 +319,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $table Name of the table to count rows for
 	 * @param string $where (optional) WHERE statement of the query
 	 * @return mixed Number of rows counter (integer) or FALSE if something went wrong (boolean)
+	 * @deprecated
 	 */
 	public function exec_SELECTcountRows($field, $table, $where = '') {
 		$count = FALSE;
@@ -327,6 +337,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param string $table Database tablename
 	 * @return mixed Result from handler
+	 * @deprecated
 	 */
 	public function exec_TRUNCATEquery($table) {
 		$res = $this->query($this->TRUNCATEquery($table));
@@ -352,6 +363,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $fields_values See exec_INSERTquery()
 	 * @param boolean $no_quote_fields See fullQuoteArray()
 	 * @return string|NULL Full SQL query for INSERT, NULL if $fields_values is empty
+	 * @deprecated
 	 */
 	public function INSERTquery($table, $fields_values, $no_quote_fields = FALSE) {
 		// Table and fieldnames should be "SQL-injection-safe" when supplied to this
@@ -381,6 +393,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $rows Table rows. Each row should be an array with field values mapping to $fields
 	 * @param boolean $no_quote_fields See fullQuoteArray()
 	 * @return string|NULL Full SQL query for INSERT, NULL if $rows is empty
+	 * @deprecated
 	 */
 	public function INSERTmultipleRows($table, array $fields, array $rows, $no_quote_fields = FALSE) {
 		// Table and fieldnames should be "SQL-injection-safe" when supplied to this
@@ -418,6 +431,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param boolean $no_quote_fields
 	 * @throws \InvalidArgumentException
 	 * @return string Full SQL query for UPDATE
+	 * @deprecated
 	 */
 	public function UPDATEquery($table, $where, $fields_values, $no_quote_fields = FALSE) {
 		// Table and fieldnames should be "SQL-injection-safe" when supplied to this
@@ -453,6 +467,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $where See exec_DELETEquery()
 	 * @return string Full SQL query for DELETE
 	 * @throws \InvalidArgumentException
+	 * @deprecated
 	 */
 	public function DELETEquery($table, $where) {
 		if (is_string($where)) {
@@ -481,6 +496,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $orderBy See exec_SELECTquery()
 	 * @param string $limit See exec_SELECTquery()
 	 * @return string Full SQL query for SELECT
+	 * @deprecated
 	 */
 	public function SELECTquery($select_fields, $from_table, $where_clause, $groupBy = '', $orderBy = '', $limit = '') {
 		foreach ($this->preProcessHookObjects as $hookObject) {
@@ -511,6 +527,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $from_table Table from which to select.
 	 * @param string $where_clause Conditional WHERE statement
 	 * @return string Full SQL query for SELECT
+	 * @deprecated
 	 */
 	public function SELECTsubquery($select_fields, $from_table, $where_clause) {
 		// Table and fieldnames should be "SQL-injection-safe" when supplied to this function
@@ -528,6 +545,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param string $table See exec_TRUNCATEquery()
 	 * @return string Full SQL query for TRUNCATE TABLE
+	 * @deprecated
 	 */
 	public function TRUNCATEquery($table) {
 		foreach ($this->preProcessHookObjects as $hookObject) {
@@ -562,6 +580,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string $limit See exec_SELECTquery()
 	 * @param array $input_parameters An array of values with as many elements as there are bound parameters in the SQL statement being executed. All values are treated as \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_AUTOTYPE.
 	 * @return \TYPO3\CMS\Core\Database\PreparedStatement Prepared statement
+	 * @deprecated
 	 */
 	public function prepare_SELECTquery($select_fields, $from_table, $where_clause, $groupBy = '', $orderBy = '', $limit = '', array $input_parameters = array()) {
 		return $this->prepareSelectQuery($select_fields, $from_table, $where_clause, $groupBy, $orderBy, $limit);
@@ -573,6 +592,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $queryParts Query parts array
 	 * @param array $input_parameters An array of values with as many elements as there are bound parameters in the SQL statement being executed. All values are treated as \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_AUTOTYPE.
 	 * @return \TYPO3\CMS\Core\Database\PreparedStatement Prepared statement
+	 * @deprecated
 	 */
 	public function prepare_SELECTqueryArray(array $queryParts, array $input_parameters = array()) {
 		return $this->prepare_SELECTquery($queryParts['SELECT'], $queryParts['FROM'], $queryParts['WHERE'], $queryParts['GROUPBY'], $queryParts['ORDERBY'], $queryParts['LIMIT'], $input_parameters);
@@ -585,6 +605,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param array $queryComponents The components of the query to execute
 	 * @return \mysqli_stmt|object MySQLi statement / DBAL object
 	 * @internal This method may only be called by \TYPO3\CMS\Core\Database\PreparedStatement
+	 * @deprecated
 	 */
 	public function prepare_PREPAREDquery($query, array $queryComponents) {
 		return $this->preparePreparedQuery($query, $queryComponents);
@@ -608,6 +629,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param boolean $allowNull Whether to allow NULL values
 	 * @return string Output string; Wrapped in single quotes and quotes in the string (" / ') and \ will be backslashed (or otherwise based on DBAL handler)
 	 * @see quoteStr()
+	 * @deprecated
 	 */
 	public function fullQuoteStr($str, $table, $allowNull = FALSE) {
 		return $this->fullQuoteString($str, $table, $allowNull);
@@ -621,6 +643,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @return string Output string; % and _ will be escaped with \ (or otherwise based on DBAL handler)
 	 * @see quoteStr()
+	 * @deprecated
 	 */
 	public function escapeStrForLike($str, $table) {
 		return $this->escapeStringForLike($str, $table);
@@ -681,6 +704,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param string $query Query to execute
 	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @deprecated
 	 */
 	public function sql_query($query) {
 		$res = $this->query($query);
@@ -715,6 +739,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
 	 * @return integer Number of resulting rows
+	 * @deprecated
 	 */
 	public function sql_num_rows($res) {
 		return $this->getResultRowCount($res);
@@ -726,6 +751,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
 	 * @return array|boolean Associative array of result row.
+	 * @deprecated
 	 */
 	public function sql_fetch_assoc($res) {
 		return $this->fetchAssoc($res);
@@ -738,6 +764,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
 	 * @return array|boolean Array with result rows.
+	 * @deprecated
 	 */
 	public function sql_fetch_row($res) {
 		return $this->fetchRow($res);
@@ -749,6 +776,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
 	 * @return boolean Returns TRUE on success or FALSE on failure.
+	 * @deprecated
 	 */
 	public function sql_free_result($res) {
 		return $this->freeResult($res);
@@ -758,6 +786,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * Get the ID generated from the previous INSERT operation
 	 *
 	 * @return integer The uid of the last inserted record.
+	 * @deprecated
 	 */
 	public function sql_insert_id() {
 		return $this->getLastInsertId();
@@ -767,6 +796,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * Returns the number of rows affected by the last INSERT, UPDATE or DELETE query
 	 *
 	 * @return integer Number of rows affected by last query
+	 * @deprecated
 	 */
 	public function sql_affected_rows() {
 		return $this->getAffectedRows();
@@ -778,6 +808,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param boolean|\mysqli_result|object $res MySQLi result object / DBAL object
 	 * @param integer $seek Seek result number.
 	 * @return boolean Returns TRUE on success or FALSE on failure.
+	 * @deprecated
 	 */
 	public function sql_data_seek($res, $seek) {
 		if ($this->debugCheckRecordset($res)) {
@@ -973,6 +1004,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 *
 	 * @param string $connectionCharset The connection charset that will be passed on to mysqli_set_charset() when connecting the database. Default is utf8.
 	 * @return void
+	 * @deprecated
 	 */
 	public function setConnectionCharset($connectionCharset = 'utf8') {
 		$this->setDatabaseCharset($connectionCharset);
@@ -989,6 +1021,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @throws \UnexpectedValueException
 	 * @internal param string $user Username to connect with.
 	 * @return void
+	 * @deprecated
 	 */
 	public function connectDB($host = NULL, $username = NULL, $password = NULL, $db = NULL) {
 		// Early return if connected already
@@ -1010,6 +1043,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @param string|null $username Database user name
 	 * @param string|null $password User password
 	 * @param string|null $db Database
+	 * @deprecated
 	 */
 	protected function handleDeprecatedConnectArguments($host = NULL, $username = NULL, $password = NULL, $db = NULL) {
 		GeneralUtility::deprecationLog(
