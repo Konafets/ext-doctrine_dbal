@@ -150,10 +150,9 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function insertQueryCreateValidQuery() {
-		$this->markTestIncomplete('Need to be implemented');
 		$fieldValues = array($this->testField => 'Foo');
-		$queryExpected = 'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ') VALUES (\'Foo\')';
-		$queryGenerated = $this->subject->createInsertQuery($this->testTable, $fieldValues);
+		$queryExpected = 'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ') VALUES(\'Foo\')';
+		$queryGenerated = $this->subject->insertQuery($this->testTable, $fieldValues);
 		$this->assertSame($queryExpected, $queryGenerated);
 	}
 
@@ -323,7 +322,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function executeDeleteQueryReturnsInsertRows() {
-		$this->markTestIncomplete('executeInsertQueryNeedsToBeImplementedFirst');
 		$fields = array(
 				$this->testField => 'Foo',
 				$this->testFieldSecond => 'Bar'
@@ -349,9 +347,8 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function deleteQueryCreateValidQuery() {
-		$this->markTestIncomplete('Need to be implemented');
 		$expectedSql = 'DELETE FROM ' . $this->testTable . ' WHERE ' . $this->testField . '=Foo';
-		$queryGenerated = $this->subject->deleteQuery($this->testTable, array($this->testField => 'Foo'))->getSql();
+		$queryGenerated = $this->subject->deleteQuery($this->testTable, $this->testField . '=Foo');
 		$this->assertSame($expectedSql, $queryGenerated);
 	}
 
@@ -603,7 +600,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function getLastInsertIdReturnsCorrectId() {
-		$this->markTestIncomplete();
 		$this->subject->executeInsertQuery($this->testTable, array($this->testField => 'testA'));
 		$this->subject->executeInsertQuery($this->testTable, array($this->testField => 'testB'));
 		$this->subject->executeInsertQuery($this->testTable, array($this->testField => 'testC'));
@@ -615,7 +611,6 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function getAffectedRowsReturnsCorrectAmountOfRows() {
-		$this->markTestIncomplete();
 		$this->subject->executeInsertQuery($this->testTable, array($this->testField => 'test'));
 		$this->assertEquals(1, $this->subject->getAffectedRows());
 	}

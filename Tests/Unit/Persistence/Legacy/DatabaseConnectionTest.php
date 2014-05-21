@@ -568,7 +568,7 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 */
 	public function INSERTqueryCreateValidQuery() {
 		$fieldValues = array($this->testField => 'Foo');
-		$queryExpected = 'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ') VALUES (\'Foo\')';
+		$queryExpected = 'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ') VALUES(\'Foo\')';
 		$queryGenerated = $this->subject->INSERTquery($this->testTable, $fieldValues);
 		$this->assertSame($queryExpected, $queryGenerated);
 	}
@@ -582,7 +582,7 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 				$this->testFieldSecond => 'Bar'
 		);
 		$queryExpected =
-			'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ',' . $this->testFieldSecond . ') VALUES (\'Foo\',\'Bar\')';
+			'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ', ' . $this->testFieldSecond . ') VALUES(\'Foo\', \'Bar\')';
 		$queryGenerated = $this->subject->INSERTquery($this->testTable, $fieldValues);
 		$this->assertSame($queryExpected, $queryGenerated);
 	}

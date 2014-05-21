@@ -6,6 +6,7 @@
 	"license": ["GPL-2.0+"],
 	"version": "6.2.0",
 	"require": {
-		"doctrine/dbal": "2.4.*"
-	}
+		"doctrine/dbal": "dev-master"
+	},
+	"mininum-stability": "dev"
 }

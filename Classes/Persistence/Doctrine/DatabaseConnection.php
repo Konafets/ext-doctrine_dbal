@@ -895,19 +895,42 @@ class DatabaseConnection {
 	}
 
 	/**
-	 * Creates and executes an INSERT SQL-statement for $table from the array with field/value pairs $data.
-	 * Using this function specifically allows us to handle BLOB and CLOB fields depending on DB
+	 * Executes a INSERT SQL-statement for $table where $where-clause
 	 *
-	 * @param string  $table         Table name
-	 * @param array   $data          Field values as key=>value pairs. Values will be escaped internally.
-	 *                               Typically you would fill an array like "$insertFields" with 'fieldname'=>'value'
-	 *                               and pass it to this function as argument.
-	 * @param boolean $noQuoteFields See fullQuoteArray()
+	 * @param string $table Database table name
+	 * @param array  $where The insertion criteria. An associative array containing column-value pairs eg. array('uid' => 1).
+	 * @param array  $types The types of identifiers.
 	 *
-	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @return integer The affected rows
 	 * @api
 	 */
-	public function executeInsertQuery($table, array $data, $noQuoteFields = FALSE) {
+	public function executeInsertQuery($table, array $where, array $types = array()) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		if (empty($types)) {
+			foreach ($where as $key => $value) {
+				if (is_int($value)) {
+					$types[$key] = \PDO::PARAM_INT;
+				} else if (is_string($value)) {
+					$types[$key] = \PDO::PARAM_STR;
+				}
+			}
+		}
+
+		$this->affectedRows = $this->link->insert($table, $where, $types);
+
+		if ($this->getDebugMode()) {
+			$this->debug('executeInsertQuery');
+		}
+
+		foreach ($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_INSERTquery_postProcessAction($table, $where, FALSE, $this);
+		}
+
+		return $this->affectedRows;
 	}
 
 	/**
@@ -958,8 +981,41 @@ class DatabaseConnection {
 		return $this->link->delete($tableName, $identifier, $types);
 	}
 
+	/**
+	 * Executes a DELETE SQL-statement for $table where $where-clause
+	 *
+	 * @param string $table Database table name
+	 * @param array  $where The deletion criteria. An associative array containing column-value pairs eg. array('uid' => 1).
+	 * @param array  $types The types of identifiers.
+	 *
+	 * @return integer The affected rows
 	 */
-	public function executeDeleteQuery($table, $where) {
+	public function executeDeleteQuery($table, array $where, array $types = array()) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		if (empty($types)) {
+			foreach ($where as $key => $value) {
+				if (is_int($value)) {
+					$types[$key] = \PDO::PARAM_INT;
+				} else if (is_string($value)) {
+					$types[$key] = \PDO::PARAM_STR;
+				}
+			}
+		}
+
+		$this->affectedRows = $this->link->delete($table, $where, $types);
+
+		if ($this->getDebugMode()) {
+			$this->debug('executeDeleteQuery');
+		}
+		foreach ($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_DELETEquery_postProcessAction($table, $where, $this);
+		}
+
+		return $this->affectedRows;
 	}
 
 	/**
@@ -1096,17 +1152,96 @@ class DatabaseConnection {
 	}
 
 	/**
-	 * Creates an INSERT SQL-statement for $table from the array with field/value pairs $data.
+	 * Inserts a table row with specified data.
 	 *
-	 * @param string  $table         See executeInsertQuery()
-	 * @param array   $data          See executeInsertQuery()
-	 * @param boolean $noQuoteFields See fullQuoteArray()
+	 * Table expression and columns are not escaped and are not safe for user-input.
 	 *
-	 * @return string|NULL Full SQL query for INSERT, NULL if $fields_values is empty
+	 * @param string $table The expression of the table to insert data into, quoted or unquoted.
+	 * @param array  $data An associative array containing column-value pairs.
+	 * @param array  $types Types of the inserted data.
+	 *
+	 * @return integer The number of affected rows.
 	 * @api
 	 */
-	public function createInsertQuery($table, array $data, $noQuoteFields = FALSE) {
+	public function insert($table, array $data, array $types = array()) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
 
+		if (empty($types)) {
+			foreach ($data as $key => $value) {
+				if (is_int($value)) {
+					$types[$key] = \PDO::PARAM_INT;
+				} else if (is_string($value)) {
+					$types[$key] = \PDO::PARAM_STR;
+				}
+			}
+		}
+
+		if ($this->getDebugMode()) {
+			$this->debug('insert');
+		}
+
+		foreach ($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_INSERTquery_postProcessAction($table, $data, FALSE, $this);
+		}
+
+		return $this->link->insert($table, $data, $types);
+	}
+
+	/**
+	 * Creates an INSERT SQL-statement for $table from the array with field/value pairs $data.
+	 *
+	 * @return \Konafets\DoctrineDbal\Persistence\Database\InsertQueryInterface
+	 * @api
+	 */
+	public function createInsertQuery() {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		return GeneralUtility::makeInstance('\\Konafets\\DoctrineDbal\\Persistence\\Doctrine\\InsertQuery', $this->link);
+	}
+
+	/**
+	 * Creates an INSERT SQL-statement for $table from the array with field/value pairs $fieldsValues.
+	 *
+	 * @param string $table
+	 * @param array  $fieldsValues
+	 * @param bool   $noQuoteFields
+	 *
+	 * @return string|NULL Full SQL query for INSERT, NULL if $fields_values is empty
+	 * @deprecated
+	 */
+	public function insertQuery($table, array $fieldsValues, $noQuoteFields = FALSE){
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		// Table and fieldnames should be "SQL-injection-safe" when supplied to this
+		// function (contrary to values in the arrays which may be insecure).
+		if (!is_array($fieldsValues) || count($fieldsValues) === 0) {
+			return NULL;
+		}
+
+		foreach ($this->preProcessHookObjects as $hookObject) {
+			$hookObject->INSERTquery_preProcessAction($table, $fieldsValues, $noQuoteFields, $this);
+		}
+
+		// Quote and escape values
+		$fieldsValues = $this->fullQuoteArray($fieldsValues, $table, $noQuoteFields, TRUE);
+
+		// Build query
+		$query = $this->createInsertQuery()->insertInto($table)->values($fieldsValues);
+
+		$query = $query->getSql();
+
+		if ($this->getDebugMode() || $this->getStoreLastBuildQuery()) {
+			$this->debug_lastBuiltQuery = $query;
+		}
+
+		return $query;
 	}
 
 	/**
@@ -1273,7 +1408,6 @@ class DatabaseConnection {
 		// Build basic query:
 		$query = $this->createTruncateQuery()->truncate($table)->getSql();
 
-		// Return query:
 		if ($this->getDebugMode() || $this->getStoreLastBuildQuery()) {
 			$this->debug_lastBuiltQuery = $query;
 		}

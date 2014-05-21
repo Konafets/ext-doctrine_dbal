@@ -366,23 +366,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @deprecated
 	 */
 	public function INSERTquery($table, $fields_values, $no_quote_fields = FALSE) {
-		// Table and fieldnames should be "SQL-injection-safe" when supplied to this
-		// function (contrary to values in the arrays which may be insecure).
-		if (!is_array($fields_values) || count($fields_values) === 0) {
-			return NULL;
-		}
-		foreach ($this->preProcessHookObjects as $hookObject) {
-			$hookObject->INSERTquery_preProcessAction($table, $fields_values, $no_quote_fields, $this);
-		}
-		// Quote and escape values
-		$fields_values = $this->fullQuoteArray($fields_values, $table, $no_quote_fields, TRUE);
-		// Build query
-		$query = 'INSERT INTO ' . $table . ' (' . implode(',', array_keys($fields_values)) . ') VALUES ' . '(' . implode(',', $fields_values) . ')';
-		// Return query
-		if ($this->debugOutput || $this->store_lastBuiltQuery) {
-			$this->debug_lastBuiltQuery = $query;
-		}
-		return $query;
+		return parent::insertQuery($table, $fields_values, $no_quote_fields = FALSE);
 	}
 
 	/**
