@@ -1098,16 +1098,13 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 		return array(
 			'debugOutput',
 			'explainOutput',
-			'databaseHost',
-			'databasePort',
-			'databaseSocket',
-			'databaseName',
-			'databaseUsername',
-			'databaseUserPassword',
 			'persistentDatabaseConnection',
 			'connectionCompression',
 			'initializeCommandsAfterConnect',
-			'default_charset',
+			'schema',
+			'schemaManager',
+			'platform',
+		    'connectionParams',
 		);
 	}
 }
