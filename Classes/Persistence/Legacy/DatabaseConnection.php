@@ -548,18 +548,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @deprecated
 	 */
 	public function TRUNCATEquery($table) {
-		foreach ($this->preProcessHookObjects as $hookObject) {
-			/** @var $hookObject PreProcessQueryHookInterface */
-			$hookObject->TRUNCATEquery_preProcessAction($table, $this);
-		}
-		// Table should be "SQL-injection-safe" when supplied to this function
-		// Build basic query:
-		$query = 'TRUNCATE TABLE ' . $table;
-		// Return query:
-		if ($this->debugOutput || $this->store_lastBuiltQuery) {
-			$this->debug_lastBuiltQuery = $query;
-		}
-		return $query;
+		return parent::truncateQuery($table);
 	}
 
 

@@ -28,9 +28,10 @@ namespace Konafets\DoctrineDbal\Persistence\Doctrine;
  *  This copyright notice MUST APPEAR in all copies of the script!
  ***************************************************************/
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Logging\DebugStack;
 use Konafets\DoctrineDbal\Exception\ConnectionException;
 use Konafets\DoctrineDbal\Exception\InvalidArgumentException;
-use Konafets\DoctrineDbal\Persistence\Legacy\PreparedStatement;
+use Konafets\DoctrineDbal\Persistence\Doctrine\PreparedStatement;
 use PDO;
 use TYPO3\CMS\Core\Utility\DebugUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -91,6 +92,11 @@ class DatabaseConnection {
 	 * @var \Doctrine\DBAL\Connection $link Database connection object
 	 */
 	protected $link = NULL;
+
+	/**
+	 * @var \Doctrine\DBAL\Logging\SQLLogger
+	 */
+	protected $logger = NULL;
 
 	/**
 	 * @var boolean TRUE if database connection is established
@@ -439,6 +445,18 @@ class DatabaseConnection {
 	}
 
 	/**
+	 * @return \Doctrine\DBAL\Driver\Statement
+	 * @api
+	 */
+	public function getLastStatement() {
+		$queries = $this->logger->queries;
+		$currentQuery = $this->logger->currentQuery;
+		$lastStatement = $queries[$currentQuery]['sql'];
+
+		return $lastStatement;
+	}
+
+	/**
 	 * Set the debug mode.
 	 *
 	 * Possible values are:
@@ -629,7 +647,7 @@ class DatabaseConnection {
 	 */
 	private function initDoctrine() {
 		$this->databaseConfiguration = GeneralUtility::makeInstance('\\Doctrine\\DBAL\\Configuration');
-//		$this->databaseConfiguration->setSQLLogger(new DebugStack());
+		$this->databaseConfiguration->setSQLLogger(new DebugStack());
 		$this->schema = GeneralUtility::makeInstance('\\Doctrine\\DBAL\\Schema\\Schema');
 	}
 
@@ -662,6 +680,8 @@ class DatabaseConnection {
 		$this->platform = $connection->getDatabasePlatform();
 
 		$connection->connect();
+
+		$this->logger = $connection->getConfiguration()->getSQLLogger();
 
 		// We need to map the enum type to string because Doctrine don't support it native
 		// This is necessary when the installer loops through all tables of all databases it found using this connection
@@ -1046,12 +1066,27 @@ class DatabaseConnection {
 	/**
 	 * Truncates a table.
 	 *
-	 * @param string $table Database tablename
+	 * @param string $table Database table name
 	 *
-	 * @return mixed Result from handler
-	 * @api
+	 * @return integer The affected rows
 	 */
 	public function executeTruncateQuery($table) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+		foreach ($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_TRUNCATEquery_postProcessAction($table, $this);
+		}
+
+		$this->affectedRows = $this->createTruncateQuery($table)->execute();
+
+		if ($this->getDebugMode()) {
+			$this->debug('executeTruncateQuery');
+		}
+
+
+		return $this->affectedRows;
 	}
 
 	/**
@@ -1163,16 +1198,47 @@ class DatabaseConnection {
 
 	}
 
+
 	/**
 	 * Creates a TRUNCATE TABLE SQL-statement
 	 *
-	 * @param string $table See executeTruncateQuery()
+	 * @param string $table See exec_TRUNCATEquery()
 	 *
-	 * @return string Full SQL query for TRUNCATE TABLE
+	 * @return string|\Konafets\DoctrineDbal\Persistence\Doctrine\TruncateQuery
 	 * @api
 	 */
-	public function createTruncateQuery($table) {
+	public function createTruncateQuery($table = '') {
+		foreach ($this->preProcessHookObjects as $hookObject) {
+			/** @var $hookObject PreProcessQueryHookInterface */
+			$hookObject->TRUNCATEquery_preProcessAction($table, $this);
+		}
+			return GeneralUtility::makeInstance('\\Konafets\\DoctrineDbal\\Persistence\\Doctrine\\TruncateQuery', $this->link);
+	}
 
+	/**
+	 * Creates a TRUNCATE TABLE SQL-statement
+	 *
+	 * @param string $table See exec_TRUNCATEquery()
+	 *
+	 * @return string
+	 * @api
+	 */
+	public function truncateQuery($table) {
+		foreach ($this->preProcessHookObjects as $hookObject) {
+			/** @var $hookObject PreProcessQueryHookInterface */
+			$hookObject->TRUNCATEquery_preProcessAction($table, $this);
+		}
+
+		// Table should be "SQL-injection-safe" when supplied to this function
+		// Build basic query:
+		$query = $this->createTruncateQuery()->truncate($table)->getSql();
+
+		// Return query:
+		if ($this->getDebugMode() || $this->getStoreLastBuildQuery()) {
+			$this->debug_lastBuiltQuery = $query;
+		}
+
+		return $query;
 	}
 
 	/**
