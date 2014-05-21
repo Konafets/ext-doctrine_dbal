@@ -340,8 +340,8 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function deleteQueryWithoutWhereClauseCreateValidQuery() {
-		$expectedSql = 'DELETE FROM ' . $this->testTable;
-		$queryGenerated = $this->subject->deleteQuery($this->testTable);
+		$expectedSql = 'DELETE FROM ' . $this->testTable . ' WHERE id=1';
+		$queryGenerated = $this->subject->deleteQuery($this->testTable, 'id=1');
 		$this->assertSame($expectedSql, $queryGenerated);
 	}
 

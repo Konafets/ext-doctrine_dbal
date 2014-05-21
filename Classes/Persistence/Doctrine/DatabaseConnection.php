@@ -944,14 +944,20 @@ class DatabaseConnection {
 	}
 
 	/**
-	 * Creates and executes a DELETE SQL-statement for $table where $where-clause
+	 * Executes an SQL DELETE statement on a table.
+	 * This uses Positional Prepared Statements
 	 *
-	 * @param string $table Database tablename
-	 * @param string $where WHERE clause, eg. "uid=1".
-	 *                      NOTICE: You must escape values in this argument with $this->fullQuoteStr() yourself!
+	 * @param string $tableName  The name of the table on which to delete.
+	 * @param array  $identifier The deletion criteria. An associative array containing column-value pairs.
+	 * @param array  $types      The types of identifiers.
 	 *
-	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
+	 * @return integer The number of affected rows.
 	 * @api
+	*/
+	public function delete($tableName, array $identifier, array $types = array()) {
+		return $this->link->delete($tableName, $identifier, $types);
+	}
+
 	 */
 	public function executeDeleteQuery($table, $where) {
 	}
@@ -1136,17 +1142,51 @@ class DatabaseConnection {
 	}
 
 	/**
-	 * Creates a DELETE SQL-statement for $table where $where-clause
+	 * Creates and returns a SQL DELETE statement on a table without executes it
 	 *
-	 * @param string $table See executeDeleteQuery()
-	 * @param string $where See executeDeleteQuery()
+	 * @param string $tableName Database table name
+	 * @param string $where     The deletion criteria. An associative array containing column-value pairs eg. array('uid' => 1).
 	 *
-	 * @return string Full SQL query for DELETE
 	 * @throws \InvalidArgumentException
+	 * @return string The SQL DELETE statement
+	 */
+	public function deleteQuery($tableName, $where) {
+		if (is_string($where)) {
+			$query = $this->createDeleteQuery();
+			$query->delete($tableName)->where($where);
+
+			foreach ($this->preProcessHookObjects as $hookObject) {
+				/** @var $hookObject PreProcessQueryHookInterface */
+				$hookObject->DELETEquery_preProcessAction($tableName, $where, $this);
+			}
+
+			// Table and fieldnames should be "SQL-injection-safe" when supplied to this function
+			$query = $query->getSql();
+
+			if ($this->debugOutput || $this->store_lastBuiltQuery) {
+				$this->debug_lastBuiltQuery = $query;
+			}
+
+			return $query;
+		} else {
+			throw new \InvalidArgumentException('TYPO3 Fatal Error: "Where" clause argument for DELETE query was not a string in $this->DELETEquery() !', 1270853881);
+		}
+	}
+
+	/**
+	 * Creates a DELETE query object
+	 *
+	 *
+	 * @throws \InvalidArgumentException
+	 * @return \Konafets\DoctrineDbal\Persistence\Database\DeleteQueryInterface
 	 * @api
 	 */
-	public function createDeleteQuery($table, $where) {
+	public function createDeleteQuery() {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
 
+		return GeneralUtility::makeInstance('\\Konafets\\DoctrineDbal\\Persistence\\Doctrine\\DeleteQuery', $this->link);
 	}
 
 	/**

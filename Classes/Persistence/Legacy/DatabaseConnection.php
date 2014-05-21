@@ -470,20 +470,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @deprecated
 	 */
 	public function DELETEquery($table, $where) {
-		if (is_string($where)) {
-			foreach ($this->preProcessHookObjects as $hookObject) {
-				/** @var $hookObject PreProcessQueryHookInterface */
-				$hookObject->DELETEquery_preProcessAction($table, $where, $this);
-			}
-			// Table and fieldnames should be "SQL-injection-safe" when supplied to this function
-			$query = 'DELETE FROM ' . $table . ((string)$where !== '' ? ' WHERE ' . $where : '');
-			if ($this->debugOutput || $this->store_lastBuiltQuery) {
-				$this->debug_lastBuiltQuery = $query;
-			}
-			return $query;
-		} else {
-			throw new \InvalidArgumentException('TYPO3 Fatal Error: "Where" clause argument for DELETE query was not a string in $this->DELETEquery() !', 1270853881);
-		}
+		return parent::deleteQuery($table, $where);
 	}
 
 	/**
