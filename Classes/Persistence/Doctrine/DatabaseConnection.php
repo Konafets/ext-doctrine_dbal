@@ -898,19 +898,19 @@ class DatabaseConnection {
 	 * Executes a INSERT SQL-statement for $table where $where-clause
 	 *
 	 * @param string $table Database table name
-	 * @param array  $where The insertion criteria. An associative array containing column-value pairs eg. array('uid' => 1).
+	 * @param array  $data The insertion criteria. An associative array containing column-value pairs eg. array('uid' => 1).
 	 * @param array  $types The types of identifiers.
 	 *
 	 * @return integer The affected rows
 	 * @api
 	 */
-	public function executeInsertQuery($table, array $where, array $types = array()) {
+	public function executeInsertQuery($table, array $data, array $types = array()) {
 		if (!$this->isConnected) {
 			$this->connectDatabase();
 		}
 
 		if (empty($types)) {
-			foreach ($where as $key => $value) {
+			foreach ($data as $key => $value) {
 				if (is_int($value)) {
 					$types[$key] = \PDO::PARAM_INT;
 				} else if (is_string($value)) {
@@ -919,7 +919,7 @@ class DatabaseConnection {
 			}
 		}
 
-		$this->affectedRows = $this->link->insert($table, $where, $types);
+		$this->affectedRows = $this->link->insert($table, $data, $types);
 
 		if ($this->getDebugMode()) {
 			$this->debug('executeInsertQuery');
@@ -927,7 +927,7 @@ class DatabaseConnection {
 
 		foreach ($this->postProcessHookObjects as $hookObject) {
 			/** @var $hookObject PostProcessQueryHookInterface */
-			$hookObject->exec_INSERTquery_postProcessAction($table, $where, FALSE, $this);
+			$hookObject->exec_INSERTquery_postProcessAction($table, $data, FALSE, $this);
 		}
 
 		return $this->affectedRows;

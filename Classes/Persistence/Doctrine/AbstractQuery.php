@@ -106,6 +106,13 @@ abstract class AbstractQuery {
 	private $affectedRows = -1;
 
 	/**
+	 * The QueryBuilder from Doctrine DBAL
+	 *
+	 * @var \Doctrine\DBAL\Query\QueryBuilder
+	 */
+	protected $queryBuilder;
+
+	/**
 	 * The constructor
 	 *
 	 * @param Connection $connection
@@ -113,6 +120,7 @@ abstract class AbstractQuery {
 	public function __construct(Connection $connection) {
 		$this->connection = $connection;
 		$this->expr = GeneralUtility::makeInstance('\\Konafets\\DoctrineDbal\\Persistence\\Doctrine\\Expression', $connection);
+		$this->queryBuilder = $connection->createQueryBuilder();
 	}
 
 	/**

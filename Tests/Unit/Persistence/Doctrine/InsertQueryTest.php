@@ -31,13 +31,13 @@ namespace Konafets\DoctrineDbal\Tests\Unit\Persistence\Doctrine;
 /**
  * Class InsertQueryTest
  * 
- * @package TYPO3\DoctrineDbal\Persistence\Doctrine
+ * @package Konafets\DoctrineDbal\Persistence\Doctrine
  * @author  Stefano Kowalke <blueduck@gmx.net>
  */
 class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 
 	/**
-	 * @var \TYPO3\DoctrineDbal\Persistence\Doctrine\InsertQuery
+	 * @var \Konafets\DoctrineDbal\Persistence\Doctrine\InsertQuery
 	 */
 	private $subject = NULL;
 
@@ -91,9 +91,8 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function insertTable() {
-		$columns = array($this->testField, $this->testFieldSecond);
-		$values = array('Foo', 'Bar');
-		$this->subject->insertInto($this->testTable)->set($columns, $values);
+		$values = array($this->testField => 'Foo', $this->testFieldSecond => 'Bar');
+		$this->subject->insertInto($this->testTable)->values($values);
 		$expectedSql = 'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ', ' . $this->testFieldSecond . ') VALUES(Foo, Bar)';
 
 		$this->assertSame($expectedSql, $this->subject->getSql());
@@ -104,8 +103,12 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 */
 	public function insertTableStringWithPreparedStatements() {
 		$result = $this->subject->insertInto($this->testTable)
-				->set($this->testField, $this->subject->bindValue('Foo'))
-				->set($this->testFieldSecond, $this->subject->bindValue('Bar'))
+				->values(
+					array(
+						$this->testField => $this->subject->bindValue('Foo'),
+						$this->testFieldSecond => $this->subject->bindValue('Bar')
+					)
+				)
 				->getSql();
 		$expectedSql = 'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ', ' . $this->testFieldSecond . ') VALUES(:placeholder1, :placeholder2)';
 
@@ -116,9 +119,8 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function insertTableArrayWithPreparedStatements() {
-		$columns = array($this->testField, $this->testFieldSecond);
-		$values = array($this->subject->bindValue('Foo'), $this->subject->bindValue('Bar'));
-		$result = $this->subject->insertInto($this->testTable)->set($columns, $values)->getSql();
+		$values = array($this->testField => $this->subject->bindValue('Foo'), $this->testFieldSecond => $this->subject->bindValue('Bar'));
+		$result = $this->subject->insertInto($this->testTable)->values($values)->getSql();
 
 		$expectedSql = 'INSERT INTO ' . $this->testTable . ' (' . $this->testField . ', ' . $this->testFieldSecond . ') VALUES(:placeholder1, :placeholder2)';
 		$this->assertSame($expectedSql, $result);
@@ -128,9 +130,8 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function insertTableArrayWithCustomQuoting() {
-		$columns = array($GLOBALS['TYPO3_DB']->quoteColumn($this->testField), $GLOBALS['TYPO3_DB']->quoteColumn($this->testFieldSecond));
-		$values = array($GLOBALS['TYPO3_DB']->quote('Foo'), $GLOBALS['TYPO3_DB']->quote('Bar'));
-		$result = $this->subject->insertInto($this->testTable)->set($columns, $values)->getSql();
+		$values = array($GLOBALS['TYPO3_DB']->quoteColumn($this->testField) => $GLOBALS['TYPO3_DB']->quote('Foo'), $GLOBALS['TYPO3_DB']->quoteColumn($this->testFieldSecond) => $GLOBALS['TYPO3_DB']->quote('Bar'));
+		$result = $this->subject->insertInto($this->testTable)->values($values)->getSql();
 
 		$expectedSql = 'INSERT INTO ' . $this->testTable . ' (`' . $this->testField . '`, `' . $this->testFieldSecond . '`) VALUES(\'Foo\', \'Bar\')';
 		$this->assertSame($expectedSql, $result);
@@ -141,8 +142,7 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 */
 	public function insertTableExecuteStringWithPreparedStatements() {
 		$result = $this->subject->insertInto($this->testTable)
-				->set($this->testField, $this->subject->bindValue('Foo'))
-				->set($this->testFieldSecond, $this->subject->bindValue('Bar'))
+				->values(array($this->testField => $this->subject->bindValue('Foo'), $this->testFieldSecond => $this->subject->bindValue('Bar')))
 				->execute();
 
 		$this->assertSame(1, $result);
@@ -152,9 +152,8 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function insertTableExecuteArrayWithPreparedStatements() {
-		$columns = array($this->testField, $this->testFieldSecond);
-		$values = array($this->subject->bindValue('Foo'), $this->subject->bindValue('Bar'));
-		$result = $this->subject->insertInto($this->testTable)->set($columns, $values)->execute();
+		$values = array($this->testField => $this->subject->bindValue('Foo'), $this->testFieldSecond => $this->subject->bindValue('Bar'));
+		$result = $this->subject->insertInto($this->testTable)->values($values)->execute();
 
 		$this->assertSame(1, $result);
 	}
@@ -163,9 +162,8 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function insertTableExecuteArrayWithCustomQuoting() {
-		$columns = array($GLOBALS['TYPO3_DB']->quoteColumn($this->testField), $GLOBALS['TYPO3_DB']->quoteColumn($this->testFieldSecond));
-		$values = array($GLOBALS['TYPO3_DB']->quote('Foo'), $GLOBALS['TYPO3_DB']->quote('Bar'));
-		$result = $this->subject->insertInto($this->testTable)->set($columns, $values)->execute();
+		$values = array($GLOBALS['TYPO3_DB']->quoteColumn($this->testField) => $GLOBALS['TYPO3_DB']->quote('Foo'), $GLOBALS['TYPO3_DB']->quoteColumn($this->testFieldSecond) => $GLOBALS['TYPO3_DB']->quote('Bar'));
+		$result = $this->subject->insertInto($this->testTable)->values($values)->execute();
 
 		$this->assertSame(1, $result);
 	}
@@ -185,15 +183,6 @@ class InsertQueryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 */
 	public function insertWithIntegerAsTableThrowsException() {
 		$query = $this->subject->insertInto(0);
-		$query->getSql();
-	}
-
-	/**
-	 * @test
-	 * @expectedException \Doctrine\DBAL\Query\QueryException
-	 */
-	public function insertWithoutSetThrowsException() {
-		$query = $this->subject->insertInto($this->testTable);
 		$query->getSql();
 	}
 }

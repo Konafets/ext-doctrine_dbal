@@ -31,7 +31,7 @@ namespace Konafets\DoctrineDbal\Persistence\Database;
 /**
  * Interface InsertQueryInterface
  *
- * This code is heavily inspired by the database integration of ezPublish
+ * This code is inspired by the database integration of ezPublish
  * from Benjamin Eberlei.
  *
  * @package TYPO3\DoctrineDbal\Persistence\Database
@@ -49,22 +49,12 @@ interface InsertQueryInterface extends QueryInterface {
 	public function insertInto($table);
 
 	/**
-	 * Set the columns
-	 *
-	 * @param string $column
-	 * @param string $value
-	 *
-	 * @return InsertQueryInterface
-	 */
-	public function set($column, $value);
-
-	/**
 	 * Set the columns and the values
 	 *
 	 * @param array $values
 	 *
 	 * @return InsertQueryInterface
 	 */
-	public function values($values);
+	public function values(array $values);
 }
 
