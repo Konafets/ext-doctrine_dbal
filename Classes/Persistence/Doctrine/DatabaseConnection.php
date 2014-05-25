@@ -1027,6 +1027,29 @@ class DatabaseConnection {
 	 * @api
 	*/
 	public function delete($tableName, array $identifier, array $types = array()) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		if (empty($types)) {
+			foreach ($identifier as $key => $value) {
+				if (is_int($value)) {
+					$types[$key] = \PDO::PARAM_INT;
+				} else if (is_string($value)) {
+					$types[$key] = \PDO::PARAM_STR;
+				}
+			}
+		}
+
+		if ($this->getDebugMode()) {
+			$this->debug('delete');
+		}
+
+		foreach ($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_DELETEquery_postProcessAction($tableName, $identifier, $this);
+		}
+
 		return $this->link->delete($tableName, $identifier, $types);
 	}
 
@@ -1196,6 +1219,10 @@ class DatabaseConnection {
 			$this->debug('executeTruncateQuery');
 		}
 
+		foreach ($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_TRUNCATEquery_postProcessAction($table, $this);
+		}
 
 		return $this->affectedRows;
 	}
@@ -1386,7 +1413,7 @@ class DatabaseConnection {
 			// Table and fieldnames should be "SQL-injection-safe" when supplied to this function
 			$query = $query->getSql();
 
-			if ($this->debugOutput || $this->store_lastBuiltQuery) {
+			if ($this->getDebugMode() || $this->getStoreLastBuildQuery()) {
 				$this->debug_lastBuiltQuery = $query;
 			}
 
