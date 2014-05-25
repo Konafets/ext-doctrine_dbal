@@ -144,13 +144,16 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 */
 	public function exec_UPDATEquery($table, $where, $fields_values, $no_quote_fields = FALSE) {
 		$res = $this->query($this->UPDATEquery($table, $where, $fields_values, $no_quote_fields));
+
 		if ($this->debugOutput) {
 			$this->debug('exec_UPDATEquery');
 		}
+
 		foreach ($this->postProcessHookObjects as $hookObject) {
 			/** @var $hookObject PostProcessQueryHookInterface */
 			$hookObject->exec_UPDATEquery_postProcessAction($table, $where, $fields_values, $no_quote_fields, $this);
 		}
+
 		return $res;
 	}
 
@@ -164,13 +167,16 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 */
 	public function exec_DELETEquery($table, $where) {
 		$res = $this->query($this->DELETEquery($table, $where));
+
 		if ($this->debugOutput) {
 			$this->debug('exec_DELETEquery');
 		}
+
 		foreach ($this->postProcessHookObjects as $hookObject) {
 			/** @var $hookObject PostProcessQueryHookInterface */
 			$hookObject->exec_DELETEquery_postProcessAction($table, $where, $this);
 		}
+
 		return $res;
 	}
 
@@ -341,13 +347,16 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 */
 	public function exec_TRUNCATEquery($table) {
 		$res = $this->query($this->TRUNCATEquery($table));
+
 		if ($this->debugOutput) {
 			$this->debug('exec_TRUNCATEquery');
 		}
+
 		foreach ($this->postProcessHookObjects as $hookObject) {
 			/** @var $hookObject PostProcessQueryHookInterface */
 			$hookObject->exec_TRUNCATEquery_postProcessAction($table, $this);
 		}
+
 		return $res;
 	}
 
