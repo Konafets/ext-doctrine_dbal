@@ -612,7 +612,7 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 		$fieldsValues = array($this->testField => 'May the force be with you.');
 		$where = 'id=' . $id;
 		$queryExpected =
-			'UPDATE ' . $this->testTable . ' SET ' . $this->testField . '=\'May the force be with you.\' WHERE id=' . $id;
+			'UPDATE ' . $this->testTable . ' SET ' . $this->testField . ' = \'May the force be with you.\' WHERE id=' . $id;
 		$queryGenerated = $this->subject->UPDATEquery($this->testTable, $where, $fieldsValues);
 		$this->assertSame($queryExpected, $queryGenerated);
 	}

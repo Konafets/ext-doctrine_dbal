@@ -948,22 +948,71 @@ class DatabaseConnection {
 	}
 
 	/**
-	 * Creates and executes an UPDATE SQL-statement for $table where $where-clause (typ. 'uid=...') from the array
-	 * with field/value pairs $data
-	 * Using this function specifically allow us to handle BLOB and CLOB fields depending on DB
+	 * Executes an SQL UPDATE statement on a table.
 	 *
-	 * @param string  $table         Database table name
-	 * @param string  $where         WHERE clause, eg. "uid=1".
-	 *                               NOTICE: You must escape values in this argument with $this->fullQuoteStr() yourself!
-	 * @param array   $data          Field values as key=>value pairs. Values will be escaped internally.
-	 *                               Typically you would fill an array like "$updateFields" with 'fieldname'=>'value'
-	 *                               and pass it to this function as argument.
-	 * @param boolean $noQuoteFields See fullQuoteArray()
+	 * Table expression and columns are not escaped and are not safe for user-input.
 	 *
-	 * @return boolean|\mysqli_result|object MySQLi result object / DBAL object
-	 * @api
+	 * @param string $table      The expression of the table to update quoted or unquoted.
+	 * @param array  $data       An associative array containing column-value pairs.
+	 * @param array  $identifier The update criteria. An associative array containing column-value pairs.
+	 * @param array  $types      Types of the merged $data and $identifier arrays in that order.
+	 *
+	 * @return integer The number of affected rows.
 	 */
-	public function executeUpdateQuery($table, $where, array $data, $noQuoteFields = FALSE) {
+	public function update($table, array $data, array $identifier, array $types = array()) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		if (empty($types)) {
+			foreach ($data as $key => $value) {
+				if (is_int($value)) {
+					$types[$key] = \PDO::PARAM_INT;
+				} else if (is_string($value)) {
+					$types[$key] = \PDO::PARAM_STR;
+				}
+			}
+		}
+
+		if ($this->getDebugMode()) {
+			$this->debug('update');
+		}
+
+		foreach ($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_UPDATEquery_postProcessAction($table, $data, $identifier, FALSE, $this);
+		}
+
+		return $this->link->update($table, $data, $identifier, $types);
+	}
+
+	/**
+	 * Executes an SQL UPDATE statement on a table.
+	 *
+	 * @param string $tableName The name of the table to update.
+	 * @param array  $where     The update criteria. An associative array containing column-value pairs.
+	 * @param array  $data      An associative array containing column-value pairs.
+	 * @param array  $types     Types of the merged $data and $identifier arrays in that order.
+	 *
+	 * @return integer The number of affected rows.
+	 */
+	public function executeUpdateQuery($tableName, array $where, array $data, array $types = array()) {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
+
+		$this->affectedRows = $this->link->update($tableName, $data, $where, $types);
+
+		if ($this->getDebugMode()) {
+			$this->debug('executeUpdateQuery');
+		}
+
+		foreach($this->postProcessHookObjects as $hookObject) {
+			/** @var $hookObject PostProcessQueryHookInterface */
+			$hookObject->exec_UPDATEquery_postProcessAction($tableName, $where, $data, FALSE, $this);
+		}
+
+		return $this->affectedRows;
 	}
 
 	/**
@@ -1260,20 +1309,59 @@ class DatabaseConnection {
 	}
 
 	/**
+	 * Creates an UPDATE SQL-statement for $table where $where-clause (typ. 'uid=...') from the array with field/value pairs $fields_values.
+	 *
+	 *
+	 * @param string $table See exec_UPDATEquery()
+	 * @param string $where See exec_UPDATEquery()
+	 * @param array  $fieldsValues
+	 * @param bool   $noQuoteFields
+	 *
+	 * @throws \InvalidArgumentException
+	 * @return string Full SQL query for UPDATE
+	 */
+	public function updateQuery($table, $where, array $fieldsValues, $noQuoteFields = FALSE) {
+		// Table and fieldnames should be "SQL-injection-safe" when supplied to this
+		// function (contrary to values in the arrays which may be insecure).
+		if (is_string($where)) {
+			foreach ($this->preProcessHookObjects as $hookObject) {
+				/** @var $hookObject PreProcessQueryHookInterface */
+				$hookObject->UPDATEquery_preProcessAction($table, $where, $fieldsValues, $noQuoteFields, $this);
+			}
+
+			$query = $this->createUpdateQuery()->update($table)->where($where);
+
+			if (is_array($fieldsValues) && count($fieldsValues)) {
+				// Quote and escape values
+				$nArr = $this->fullQuoteArray($fieldsValues, $table, $noQuoteFields, TRUE);
+				foreach ($nArr as $k => $v) {
+					$query->set($k, $v);
+				}
+			}
+
+			if ($this->getDebugMode() || $this->getStoreLastBuildQuery()) {
+				$this->debug_lastBuiltQuery = $query;
+			}
+
+			return $query->getSql();
+		} else {
+			throw new \InvalidArgumentException('TYPO3 Fatal Error: "Where" clause argument for UPDATE query was not a string in $this->UPDATEquery() !', 1270853880);
+		}
+	}
+
+	/**
 	 * Creates an UPDATE SQL-statement for $table where $where-clause (typ. 'uid=...') from the array
 	 * with field/value pairs $fields_values.
 	 *
-	 * @param string  $table See executeUpdateQuery()
-	 * @param string  $where See executeUpdateQuery()
-	 * @param array   $data  See executeUpdateQuery()
-	 * @param boolean $noQuoteFields
-	 *
-	 * @return string Full SQL query for UPDATE
-	 * @throws \InvalidArgumentException
+	 * @return \Konafets\DoctrineDbal\Persistence\Doctrine\UpdateQuery
 	 * @api
 	 */
-	public function createUpdateQuery($table, $where, array $data, $noQuoteFields = FALSE) {
+	public function createUpdateQuery() {
+		if (!$this->isConnected) {
+			$this->connectDatabase();
+		}
 
+		return GeneralUtility::makeInstance('\\Konafets\\DoctrineDbal\\Persistence\\Doctrine\\UpdateQuery', $this->link);
 	}
 
 	/**

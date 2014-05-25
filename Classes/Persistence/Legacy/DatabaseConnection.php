@@ -418,30 +418,7 @@ class DatabaseConnection extends \Konafets\DoctrineDbal\Persistence\Doctrine\Dat
 	 * @deprecated
 	 */
 	public function UPDATEquery($table, $where, $fields_values, $no_quote_fields = FALSE) {
-		// Table and fieldnames should be "SQL-injection-safe" when supplied to this
-		// function (contrary to values in the arrays which may be insecure).
-		if (is_string($where)) {
-			foreach ($this->preProcessHookObjects as $hookObject) {
-				/** @var $hookObject PreProcessQueryHookInterface */
-				$hookObject->UPDATEquery_preProcessAction($table, $where, $fields_values, $no_quote_fields, $this);
-			}
-			$fields = array();
-			if (is_array($fields_values) && count($fields_values)) {
-				// Quote and escape values
-				$nArr = $this->fullQuoteArray($fields_values, $table, $no_quote_fields, TRUE);
-				foreach ($nArr as $k => $v) {
-					$fields[] = $k . '=' . $v;
-				}
-			}
-			// Build query
-			$query = 'UPDATE ' . $table . ' SET ' . implode(',', $fields) . ((string)$where !== '' ? ' WHERE ' . $where : '');
-			if ($this->debugOutput || $this->store_lastBuiltQuery) {
-				$this->debug_lastBuiltQuery = $query;
-			}
-			return $query;
-		} else {
-			throw new \InvalidArgumentException('TYPO3 Fatal Error: "Where" clause argument for UPDATE query was not a string in $this->UPDATEquery() !', 1270853880);
-		}
+		return parent::updateQuery($table, $where, $fields_values, $no_quote_fields);
 	}
 
 	/**

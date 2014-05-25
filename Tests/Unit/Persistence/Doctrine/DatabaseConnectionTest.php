@@ -192,16 +192,13 @@ class DatabaseConnectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase {
 	 * @test
 	 */
 	public function updateQueryCreateValidQuery() {
-		$this->markTestIncomplete('Need to be implemented');
-		$this->assertTrue(
-			$this->subject->adminQuery('INSERT INTO ' . $this->testTable . ' (' . $this->testField . ') VALUES (\'foo\')')
-		);
+		$this->assertSame(1, $this->subject->getDatabaseHandle()->insert($this->testTable, array($this->testField => 'foo')));
 		$id = $this->subject->getLastInsertId();
 		$fieldsValues = array($this->testField => 'May the force be with you.');
 		$where = 'id=' . $id;
 		$queryExpected =
-			'UPDATE ' . $this->testTable . ' SET ' . $this->testField . '=\'May the force be with you.\' WHERE id=' . $id;
-		$queryGenerated = $this->subject->createUpdateQuery($this->testTable, $where, $fieldsValues);
+			'UPDATE ' . $this->testTable . ' SET ' . $this->testField . ' = \'May the force be with you.\' WHERE id=' . $id;
+		$queryGenerated = $this->subject->updateQuery($this->testTable, $where, $fieldsValues);
 		$this->assertSame($queryExpected, $queryGenerated);
 	}
 
